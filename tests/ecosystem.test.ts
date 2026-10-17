@@ -94,3 +94,32 @@ test('isSafeMcpEndpoint exige https ou localhost', () => {
   assert.equal(isSafeMcpEndpoint('http://remoto.com/mcp'), false);
   assert.equal(isSafeMcpEndpoint('banana'), false);
 });
+
+// ===== Entities (banco open-source estilo Base44) =====
+import { createRecord, updateRecord, deleteRecord, listEntities, isValidEntityName } from '../src/core/tools/entity-store.ts';
+
+test('entities: CRUD completo com id/datas automáticas', () => {
+  process.env.ENTITIES_DIR = '/tmp/jarvis-test-entities';
+  const rec = createRecord('Tarefas', { titulo: 'deploy', status: 'pendente' });
+  assert.ok(rec.id && rec.created_date && rec.updated_date);
+  assert.equal(listEntities('Tarefas', { status: 'pendente' }).total, 1);
+  const upd = updateRecord('Tarefas', rec.id, { status: 'done' });
+  assert.equal(upd?.status, 'done');
+  assert.equal(upd?.created_date, rec.created_date); // não muda no update
+  assert.equal(listEntities('Tarefas', { status: 'done' }).total, 1);
+  assert.equal(deleteRecord('Tarefas', rec.id), true);
+  assert.equal(listEntities('Tarefas').total, 0);
+});
+
+test('entities: validação de nome e registro inexistente', () => {
+  assert.equal(isValidEntityName('Tarefas'), true);
+  assert.equal(isValidEntityName('../etc/passwd'), false);
+  assert.equal(updateRecord('Tarefas', 'inexistente', { a: 1 }), null);
+});
+
+// ===== Geração de imagem (Pollinations) =====
+import { generateImage } from '../src/core/tools/image-gen.ts';
+
+test('image-gen: prompt vazio rejeitado', async () => {
+  assert.equal((await generateImage('')).ok, false);
+});

@@ -36,7 +36,7 @@ describe('Conector gmail-imap (senha de app)', () => {
   });
 
   it('rejeita senha de app com tamanho errado antes de ir à rede', async () => {
-    const result = await verifyConnectorCredentials('gmail-imap', 'curta', 'papaecodelta9@gmail.com');
+    const result = await verifyConnectorCredentials('gmail-imap', 'curta', 'usuario.teste@gmail.com');
     assert.equal(result.ok, false);
     assert.match(result.error ?? '', /16 letras/);
   });

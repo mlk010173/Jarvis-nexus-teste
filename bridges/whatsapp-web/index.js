@@ -17,8 +17,8 @@ import qrcode from 'qrcode-terminal';
 import WhatsAppWeb from 'whatsapp-web.js';
 
 const JARVIS_URL = process.env.JARVIS_URL ?? 'http://localhost:3000';
-const OWNER = process.env.OWNER_WHATSAPP ?? '5527998518705'; // dono: +55 27 99851-8705
-const ALLOWED_FROM = (process.env.WHATSAPP_ALLOWED_FROM ?? OWNER).split(',').map((x) => x.trim()).filter(Boolean);
+const OWNER = process.env.OWNER_WHATSAPP ?? ''; // defina no .env (E.164 sem +)
+const OWNER2 = OWNER;\nconst ALLOWED_FROM = (process.env.WHATSAPP_ALLOWED_FROM ?? OWNER2).split(',').map((x) => x.trim()).filter(Boolean);
 
 const client = new WhatsAppWeb.Client({
   authStrategy: new WhatsAppWeb.LocalAuth({ dataPath: './session' }),

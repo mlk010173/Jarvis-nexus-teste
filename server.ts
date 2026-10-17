@@ -17,6 +17,8 @@ import { scheduleJob, cancelJob, listJobs } from './src/core/automation/cron-ser
 import { registerHook, listHooks, checkHookSecret, messageFromBody } from './src/core/automation/webhook-registry.ts';
 import { verifyMetaWebhook, parseIncomingWhatsApp, sendWhatsAppText, defaultRecipient } from './src/core/channels/whatsapp.ts';
 import { connectRemoteMcp } from './src/core/mcp/mcp-sdk-client.ts';
+import { listEntities, createRecord, updateRecord, deleteRecord, isValidEntityName } from './src/core/tools/entity-store.ts';
+import { generateImage } from './src/core/tools/image-gen.ts';
 
 dotenv.config();
 
@@ -610,6 +612,82 @@ app.post('/api/mcp/connect', async (req: Request, res: Response) => {
     return;
   }
   res.json(await connectRemoteMcp(String(endpoint), headers));
+});
+
+// ===== Entities: banco de dados do JARVIS (equivalente Base44, open-source) =====
+app.get('/api/entities', (_req: Request, res: Response) => {
+  res.json({ entities: require('fs').existsSync(process.env.ENTITIES_DIR ?? 'data/entities') ? (require('fs') as typeof import('fs')).readdirSync(process.env.ENTITIES_DIR ?? 'data/entities').filter((f: string) => f.endsWith('.json')).map((f: string) => f.replace(/\.json$/, '')) : [] });
+});
+
+app.get('/api/entities/:name', (req: Request, res: Response) => {
+  try {
+    const q = { ...(req.query as Record<string, unknown>) } as Record<string, unknown>;
+    const limit = Number(q['limit'] ?? 50) || 50;
+    const skip = Number(q['skip'] ?? 0) || 0;
+    const sort = typeof q['sort'] === 'string' ? q['sort'] : undefined;
+    delete q['limit']; delete q['skip']; delete q['sort'];
+    res.json(listEntities(req.params.name, q, { limit, skip, sort }));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Consulta inválida.' });
+  }
+});
+
+app.post('/api/entities/:name', (req: Request, res: Response) => {
+  try {
+    res.status(201).json(createRecord(req.params.name, req.body ?? {}));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Registro inválido.' });
+  }
+});
+
+app.patch('/api/entities/:name/:id', (req: Request, res: Response) => {
+  const updated = updateRecord(req.params.name, req.params.id, req.body ?? {});
+  if (!updated) {
+    res.status(404).json({ error: 'Registro não encontrado.' });
+    return;
+  }
+  res.json(updated);
+});
+
+app.delete('/api/entities/:name/:id', (req: Request, res: Response) => {
+  res.json({ deleted: deleteRecord(req.params.name, req.params.id) });
+});
+
+// ===== Geração de imagem (Pollinations — free, sem chave, open-source) =====
+app.post('/api/tools/image-gen', async (req: Request, res: Response) => {
+  const { prompt, width, height } = req.body as { prompt?: string; width?: number; height?: number };
+  if (!prompt) {
+    res.status(400).json({ error: 'Prompt obrigatório.' });
+    return;
+  }
+  res.json(await generateImage(String(prompt), width, height));
+});
+
+// ===== Telegram: envio direto por bot (free) =====
+app.post('/api/channels/telegram/send', async (req: Request, res: Response) => {
+  const { text, chatId } = req.body as { text?: string; chatId?: string };
+  const token = process.env.TELEGRAM_BOT_TOKEN ?? '';
+  const dest = chatId ?? process.env.TELEGRAM_CHAT_ID ?? '';
+  if (!text?.trim()) {
+    res.status(400).json({ error: 'Texto obrigatório.' });
+    return;
+  }
+  if (!token || !dest) {
+    res.status(400).json({ error: 'Telegram não configurado: defina TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID (crie o bot com @BotFather).' });
+    return;
+  }
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: dest, text: text.slice(0, 4000) }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const data = (await r.json()) as { ok?: boolean; description?: string };
+    res.json({ ok: data.ok === true, error: data.ok ? undefined : (data.description ?? `HTTP ${r.status}`) });
+  } catch (err) {
+    res.status(502).json({ ok: false, error: err instanceof Error ? err.message : 'Falha de rede.' });
+  }
 });
 
 // ===== Conectores (fluxo Base44: autorização no site oficial + validação real) =====

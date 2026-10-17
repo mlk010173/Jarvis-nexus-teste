@@ -143,11 +143,11 @@ test('Conta modelos ao validar chave de provedor de IA', async () => {
 });
 
 test('Valida Gmail via perfil do usuário', async () => {
-  const restore = mockFetch(200, { emailAddress: 'papaecodelta9@gmail.com', messagesTotal: 42 });
+  const restore = mockFetch(200, { emailAddress: 'usuario.teste@gmail.com', messagesTotal: 42 });
   try {
     const result = await verifyConnectorCredentials('gmail', 'ya29.xyz');
     assert.equal(result.ok, true);
-    assert.equal(result.identity, 'papaecodelta9@gmail.com');
+    assert.equal(result.identity, 'usuario.teste@gmail.com');
   } finally {
     restore();
   }
