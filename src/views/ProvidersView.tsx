@@ -11,6 +11,7 @@ import {
   HardDrive,
   WifiOff,
 } from 'lucide-react';
+import { getApiBase } from '../lib/api.ts';
 
 export interface ProviderStatus {
   id: string;
@@ -53,7 +54,7 @@ export const ProvidersView: React.FC<ProvidersViewProps> = ({
   const loadProviders = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/providers');
+      const res = await fetch(`${getApiBase()}/api/providers`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setProviders(data.providers ?? []);
@@ -73,7 +74,7 @@ export const ProvidersView: React.FC<ProvidersViewProps> = ({
   const testProvider = async (provider: ProviderStatus) => {
     setPingingId(provider.id);
     try {
-      const res = await fetch('/api/providers/test', {
+      const res = await fetch(`${getApiBase()}/api/providers/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ providerId: provider.id, model: provider.defaultModel }),

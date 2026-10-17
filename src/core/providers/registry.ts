@@ -72,7 +72,52 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     costNotes:
       'Créditos iniciais gratuitos para desenvolvedores (limitados); consumo contínuo é pago.',
     docsUrl: 'https://build.nvidia.com',
+  },  {
+    id: 'xai-grok',
+    name: 'xAI Grok',
+    kind: 'openai-compatible',
+    description:
+      'Grok (xAI) com API compatível OpenAI. Suporta respostas com raciocínio em modelos reasoning.',
+    isLocal: false,
+    envKey: 'XAI_API_KEY',
+    baseUrl: 'https://api.x.ai/v1',
+    defaultModel: 'grok-4-fast',
+    models: ['grok-4-fast', 'grok-4-mini'],
+    costNotes:
+      'Créditos grátis iniciais ao criar conta; depois é cobrado por token. Veja preços oficiais em console.x.ai.',
+    docsUrl: 'https://console.x.ai',
   },
+  {
+    id: 'kimi-moonshot',
+    name: 'Moonshot Kimi (K2)',
+    kind: 'openai-compatible',
+    description:
+      'Kimi K2 da Moonshot AI. Retorna linha de raciocínio (reasoning_content) em modelos thinking.',
+    isLocal: false,
+    envKey: 'MOONSHOT_API_KEY',
+    baseUrl: 'https://api.moonshot.ai/v1',
+    defaultModel: 'kimi-k2-turbo-preview',
+    models: ['kimi-k2-turbo-preview', 'kimi-k2-0905-preview'],
+    costNotes:
+      'Camada gratuita de boas-vindas limitada; depois cobrança por token na plataforma Moonshot.',
+    docsUrl: 'https://platform.moonshot.ai',
+  },
+  {
+    id: 'base44-superagent',
+    name: 'Base44 Superagent (API externa)',
+    kind: 'openai-compatible',
+    description:
+      'Conecta o JARVIS a um agente Base44 Superagent pela API oficial (api_key). Configure BASE44_AGENT_ID, BASE44_API_KEY e BASE44_API_BASE no servidor.',
+    isLocal: false,
+    envKey: 'BASE44_API_KEY',
+    baseUrl: 'https://api.base44.com',
+    defaultModel: 'superagent',
+    models: ['superagent'],
+    costNotes:
+      'Consome créditos do plano do agente Base44 conectado. O JARVIS atua como interface remota do seu superagente.',
+    docsUrl: 'https://app.base44.com',
+  },
+
   {
     id: 'ollama',
     name: 'Ollama (local / LAN)',

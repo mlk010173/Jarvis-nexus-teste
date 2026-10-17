@@ -1,0 +1,21 @@
+# JARVIS NEXUS — deploy online ao vivo (Render, plano gratuito, sem cartão)
+# Botão "Deploy to Render" no README usa este arquivo: cria o serviço,
+# instala dependências, sobe o servidor Express e faz health check real.
+#
+# Variáveis de ambiente para configurar NO PAINEL do Render (Settings > Env):
+#   GEMINI_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, XAI_API_KEY,
+#   MOONSHOT_API_KEY, BASE44_API_KEY + BASE44_AGENT_ID,
+#   BROWSERBASE_API_KEY + BROWSERBASE_API_SECRET (navegador ao vivo),
+#   CORS_ORIGIN (opcional: restrinja à URL do seu frontend)
+services:
+  - type: web
+    name: jarvis-nexus
+    runtime: node
+    plan: free
+    buildCommand: npm ci --legacy-peer-deps && npm run build
+    startCommand: npx tsx server.ts
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production

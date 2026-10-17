@@ -88,3 +88,31 @@ npm test
 ## 📄 Licenças e Atribuições
 - **Licença:** MIT (código 100% permissivo para uso público).
 - **Bibliotecas recomendadas:** Magic UI (MIT), Shadcn UI (MIT), Astra UI (MIT), Tailwind CSS (MIT), Lucide React (ISC).
+
+## Servidor Online ao Vivo
+
+O JARVIS NEXUS tem dois modos de operação:
+
+1. **Local:** `npm run dev` sobe o servidor Express completo (frontend + API) em `http://localhost:3000`.
+2. **Online ao vivo:** o frontend (GitHub Pages ou qualquer host estático) conversa com o servidor rodando na nuvem — chat, provedores de IA, conectores e navegador ao vivo funcionam de qualquer lugar.
+
+### Deploy em 1 clique (Render, plano grátis, sem cartão)
+
+[![Deploy to Render](https://render.com/images/deploy-button.svg)](https://render.com/deploy?repo=https://github.com/mlk010173/Jarvis-nexus-teste)
+
+O `render.yaml` configura tudo: Node 22, build do frontend, health check em `/api/health` e deploy automático a cada push. Depois de criar o serviço, adicione as chaves de IA em **Settings > Environment** (elas ficam só no servidor, nunca no app).
+
+### Alternativas (Docker)
+
+```bash
+docker build -t jarvis-nexus .
+docker run -p 3000:3000 -e GEMINI_API_KEY=... jarvis-nexus
+```
+
+Funciona em Fly.io, Koyeb, Railway, VPS ou Termux com proot.
+
+### Apontando o app para o servidor
+
+Na aba **Configurações > Servidor Online ao Vivo**, cole a URL do serviço (ex.: `https://jarvis-nexus.onrender.com`) e toque em *Testar Conexão*. O app mede a latência real e mostra o status. Para voltar ao modo local, deixe o campo vazio.
+
+> Nota: no plano gratuito do Render o servidor "dorme" após 15 min sem uso e acorda em ~50s na primeira chamada. O health check do app mostra o status real, sem fingir.

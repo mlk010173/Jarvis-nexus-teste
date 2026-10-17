@@ -9,6 +9,8 @@ import { chatWithFallback, listProviderStatus, resolveProvider } from './src/cor
 import { executePlan, PlanRunStore } from './src/core/orchestrator/executor.ts';
 import { executeShell, validateShellCommand } from './src/core/tools/shell.ts';
 import { webFetch, webSearch } from './src/core/tools/web-tools.ts';
+import { CONNECTOR_CATALOG } from './src/core/connectors/connectors-registry.ts';
+import { verifyConnectorCredentials } from './src/core/connectors/verify.ts';
 
 dotenv.config();
 
@@ -19,9 +21,25 @@ import { SimpleRateLimiter } from './src/core/security/rate-limiter.ts';
 import { SecurityGuard } from './src/core/security/security-guard.ts';
 
 const app = express();
-const PORT = 3000;
+// Porta dinâmica: provedores de nuvem (Render/Koyeb/Fly) injetam PORT no ambiente.
+const PORT = Number(process.env.PORT ?? 3000);
 
 app.use(express.json());
+
+// CORS: o frontend ao vivo (GitHub Pages ou qualquer host) chama este servidor.
+// As chaves de IA continuam vindas SOMENTE do ambiente do servidor; o CORS apenas
+// libera o consumo público dos endpoints da API (com rate limit ativo).
+app.use('/api', (req: Request, res: Response, next: () => void) => {
+  res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN ?? '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
 
 // Initialize Rate Limiters
 const generalLimiter = new SimpleRateLimiter(120, 60000); // 120 req/min
@@ -231,12 +249,13 @@ app.post('/api/mcp/dispatch', async (req: Request, res: Response) => {
 });
 
 app.post('/api/chat', aiRateLimitMiddleware, async (req: Request, res: Response) => {
-  const { message, agentId = 'nexus-orchestrator', history = [], providerId, model } = req.body as {
+  const { message, agentId = 'nexus-orchestrator', history = [], providerId, model, memoryContext } = req.body as {
     message?: string;
     agentId?: string;
     history?: Array<{ role: string; content: string }>;
     providerId?: string;
     model?: string;
+    memoryContext?: string;
   };
 
   if (!message) {
@@ -245,7 +264,19 @@ app.post('/api/chat', aiRateLimitMiddleware, async (req: Request, res: Response)
   }
 
   const agent = INITIAL_AGENTS.find(a => a.id === agentId) || INITIAL_AGENTS[0];
-  const isResearch = agent.role === 'research' || /pesquisa|notícia|hoje|latest|busca|web/i.test(message);
+  const isResearch = agent.role === 'research' || /pesquisa|notícia|noticias|hoje|latest|busca|web|fonte|link|site/i.test(message);
+
+  // Fontes REAIS: busca DuckDuckGo ao vivo antes de responder, quando o pedido
+  // é de pesquisa. O modelo recebe os links e cita [1], [2]… e a UI exibe-os.
+  let sources: Array<{ title: string; url: string; snippet?: string }> = [];
+  if (isResearch) {
+    try {
+      const hits = await webSearch(String(message), 5);
+      sources = hits.map(h => ({ title: h.title, url: h.url, snippet: h.snippet }));
+    } catch {
+      // sem rede: segue sem fontes, sem fingir
+    }
+  }
 
   const result = await chatWithFallback(
     {
@@ -258,7 +289,15 @@ app.post('/api/chat', aiRateLimitMiddleware, async (req: Request, res: Response)
       ],
       systemInstruction: `Você é ${agent.name} (${agent.title}), o cérebro do JARVIS NEXUS — Superagente autônomo open-source para celular.
 Suas instruções específicas: ${agent.instructions}
-Responda em português brasileiro de forma assertiva, moderna, profissional e sem enrolação. Quando apropriado, mencione ferramentas e agentes especializados mobilizados.`,
+Responda em português brasileiro de forma assertiva, moderna, profissional e sem enrolação. Quando apropriado, mencione ferramentas e agentes especializados mobilizados.${
+        memoryContext ? `\n\nMEMÓRIA PERSISTENTE DO USUÁRIO (use como contexto contínuo):\n${memoryContext}` : ''
+      }${
+        sources.length
+          ? `\n\nFONTES REAIS DA WEB (busca ao vivo DuckDuckGo). Cite-as no texto como [1], [2]… na ordem em que usar:\n${sources
+              .map((src, i) => `[${i + 1}] ${src.title} — ${src.url}${src.snippet ? ` — ${src.snippet.slice(0, 200)}` : ''}`)
+              .join('\n')}`
+          : ''
+      }`,
       useWebSearch: isResearch,
     },
     { providerId, model },
@@ -266,12 +305,93 @@ Responda em português brasileiro de forma assertiva, moderna, profissional e se
 
   res.json({
     response: SecurityGuard.sanitizeOutput(result.text),
+    reasoning: result.reasoning,
+    sources,
     agentId: agent.id,
     agentName: agent.name,
     provider: `${result.providerId}:${result.model}`,
     local: result.local,
     fallbackReason: result.fallbackReason,
   });
+});
+
+// ===== Conectores (fluxo Base44: autorização no site oficial + validação real) =====
+app.get('/api/connectors', (_req: Request, res: Response) => {
+  res.json({ connectors: CONNECTOR_CATALOG });
+});
+
+app.post('/api/connectors/verify', async (req: Request, res: Response) => {
+  const { connectorId, token, extra } = req.body as { connectorId?: string; token?: string; extra?: string };
+  if (!connectorId || !token) {
+    res.status(400).json({ ok: false, error: 'Conector e credencial são obrigatórios.' });
+    return;
+  }
+  const result = await verifyConnectorCredentials(connectorId, token, extra);
+  res.json(result);
+});
+
+// ===== Navegador ao vivo compartilhado =====
+// Com BROWSERBASE_API_KEY/SECRET: cria sessão real na nuvem e devolve o
+// link ao vivo (embed + compartilhável). Sem chaves: modo leitor honesto.
+app.post('/api/browser/session', async (req: Request, res: Response) => {
+  const { url: target } = req.body as { url?: string };
+  if (!target || !/^https?:\/\//.test(String(target))) {
+    res.status(400).json({ error: 'URL inválida.' });
+    return;
+  }
+  const apiKey = process.env.BROWSERBASE_API_KEY;
+  const apiSecret = process.env.BROWSERBASE_API_SECRET;
+  if (!apiKey || !apiSecret) {
+    res.json({
+      mode: 'reader',
+      notice:
+        'Sem chaves do Browserbase no servidor, o JARVIS abriu o modo leitor com o conteúdo REAL da página (navegador interativo ao vivo requer BROWSERBASE_API_KEY/SECRET).',
+    });
+    return;
+  }
+  try {
+    const createRes = await fetch('https://www.browserbase.com/v1/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-BB-API-Key': apiKey },
+      body: JSON.stringify({ projectId: process.env.BROWSERBASE_PROJECT_ID ?? undefined }),
+    });
+    if (!createRes.ok) {
+      throw new Error(`Browserbase recusou a criação da sessão (HTTP ${createRes.status}).`);
+    }
+    const session = await createRes.json();
+    const sessionId = session?.id;
+    if (!sessionId) throw new Error('Browserbase não devolveu o id da sessão.');
+    // Live View URL (co-browsing embed) — endpoint oficial /v1/sessions/{id}/live
+    const liveRes = await fetch(`https://www.browserbase.com/v1/sessions/${sessionId}/live`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-BB-API-Key': apiKey },
+      body: JSON.stringify({}),
+    });
+    const live = await liveRes.json().catch(() => null);
+    const liveUrl = live?.liveViewURL ?? live?.liveUrl ?? live?.url;
+    res.json({
+      mode: 'live',
+      sessionId: String(sessionId),
+      liveUrl,
+      target,
+      notice: liveUrl
+        ? undefined
+        : 'Sessão criada, mas o link ao vivo não foi devolvido. Configure o projeto Browserbase.',
+    });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// Modo leitor do navegador: conteúdo real da página em texto.
+app.post('/api/tools/web-fetch', async (req: Request, res: Response) => {
+  const { url } = req.body as { url?: string };
+  try {
+    const page = await webFetch(String(url || ''));
+    res.json({ url: page.url, title: page.title, text: page.text, truncated: page.truncated });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 // Vite Middleware mounting

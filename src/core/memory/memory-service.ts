@@ -49,6 +49,21 @@ const DEFAULT_MEMORIES: MemoryItem[] = [
 export class MemoryService {
   private static storageKey = 'jarvis_nexus_memories';
 
+  /**
+   * Constrói o bloco de contexto de memória que o JARVIS injeta em TODAS
+   * as conversas: a memória persistente do usuário vira parte da "mente".
+   */
+  static buildMemoryContext(maxChars = 3000): string {
+    const memories = this.getMemories();
+    if (!memories.length) return '';
+    const lines = memories.slice(0, 20).map(
+      (m) => `- [${m.category}] ${m.title}: ${m.content}`
+    );
+    let ctx = lines.join('\n');
+    if (ctx.length > maxChars) ctx = `${ctx.slice(0, maxChars)}…`;
+    return ctx;
+  }
+
   static getMemories(): MemoryItem[] {
     if (typeof window === 'undefined') return DEFAULT_MEMORIES;
     try {

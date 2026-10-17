@@ -14,6 +14,8 @@ import {
   ArrowUpRight,
   RefreshCw,
   Trash2,
+  Brain,
+  Link2,
 } from 'lucide-react';
 import { ChatMessage, ExecutionPlan } from '../core/orchestrator/types.ts';
 
@@ -162,8 +164,45 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   </div>
                 )}
 
+                {/* Linha de raciocínio do modelo (reasoning_content real) */}
+                {msg.reasoning && (
+                  <details className="mb-2 rounded-xl border border-violet-500/30 bg-violet-500/5 px-3 py-2 text-xs">
+                    <summary className="cursor-pointer list-none font-semibold text-violet-300">
+                      <Brain className="inline w-3 h-3 mr-1" />
+                      Linha de raciocínio (stream do modelo)
+                    </summary>
+                    <div className="mt-2 whitespace-pre-wrap text-violet-200/80 leading-relaxed">
+                      {msg.reasoning}
+                    </div>
+                  </details>
+                )}
+
                 {/* Content rendered with line breaks */}
                 <div className="whitespace-pre-wrap">{msg.content}</div>
+
+                {/* Fontes reais citadas na resposta (links oficiais) */}
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-3 border-t border-slate-700/50 pt-2">
+                    <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                      <Link2 className="w-3 h-3" /> Fontes reais da web
+                    </p>
+                    <ol className="space-y-1">
+                      {msg.sources.map((src, i) => (
+                        <li key={i} className="text-[11px]">
+                          <span className="text-slate-500">[{i + 1}]</span>{' '}
+                          <a
+                            href={src.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-400 hover:text-cyan-300 hover:underline break-all"
+                          >
+                            {src.title || src.url}
+                          </a>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
 
                 {/* Plan Preview Banner if associated */}
                 {msg.planPreview && (

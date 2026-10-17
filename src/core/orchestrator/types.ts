@@ -102,4 +102,12 @@ export interface ChatMessage {
     url: string;
     source: string;
   }[];
+  /** Linha de raciocínio do modelo (quando o provedor expõe reasoning_content). */
+  reasoning?: string;
+  /** Fontes reais da web citadas na resposta, com link. */
+  sources?: {
+    title: string;
+    url: string;
+    snippet?: string;
+  }[];
 }

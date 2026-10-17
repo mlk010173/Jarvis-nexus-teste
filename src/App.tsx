@@ -39,6 +39,8 @@ const SettingsView = lazy(() => import('./views/SettingsView.tsx').then((m) => (
 const PromptForgeView = lazy(() => import('./views/PromptForgeView.tsx').then((m) => ({ default: m.PromptForgeView })));
 const SandboxView = lazy(() => import('./views/SandboxView.tsx').then((m) => ({ default: m.SandboxView })));
 const McpView = lazy(() => import('./views/McpView.tsx').then((m) => ({ default: m.McpView })));
+const ConnectorsView = lazy(() => import('./views/ConnectorsView.tsx').then((m) => ({ default: m.ConnectorsView })));
+const BrowserView = lazy(() => import('./views/BrowserView.tsx').then((m) => ({ default: m.BrowserView })));
 
 import { ViewSkeleton } from './components/ViewSkeleton.tsx';
 import { useToast } from './components/Toast.tsx';
@@ -47,8 +49,11 @@ import { AgentProfile, ChatMessage, ExecutionPlan, AutonomyLevel } from './core/
 import { NexusOrchestrator } from './core/orchestrator/orchestrator.ts';
 import { StorageService, JarvisBackupBundle } from './core/storage/storage-service.ts';
 import { useVoice } from './hooks/useVoice.ts';
+import { Link2, MonitorPlay } from 'lucide-react';
+import { MemoryService } from './core/memory/memory-service.ts';
 import { useSoundEffects } from './hooks/useSoundEffects.ts';
 import { usePWAInstall } from './hooks/usePWAInstall.ts';
+import { getApiBase } from './lib/api.ts';
 
 const INITIAL_GREETING_MESSAGE: ChatMessage = {
   id: 'msg-init-1',
@@ -151,7 +156,7 @@ export default function App() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const res = await fetch('/api/health');
+        const res = await fetch(`${getApiBase()}/api/health`);
         if (res.ok) {
           const data = await res.json();
           setHasGeminiKey(data.hasGeminiKey);
@@ -225,7 +230,7 @@ export default function App() {
 
         // If backend API is reachable, request summary
         try {
-          const planRes = await fetch('/api/orchestrate', {
+          const planRes = await fetch(`${getApiBase()}/api/orchestrate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ goal: text, autonomyLevel }),
@@ -255,7 +260,7 @@ export default function App() {
       }
 
       // Regular Chat Request
-      const chatRes = await fetch('/api/chat', {
+      const chatRes = await fetch(`${getApiBase()}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -264,6 +269,7 @@ export default function App() {
           history: messages.slice(-5),
           providerId: activeProviderId,
           model: activeModel,
+          memoryContext: MemoryService.buildMemoryContext(),
         }),
       });
 
@@ -281,6 +287,8 @@ export default function App() {
         role: 'assistant',
         agentName: chatData.agentName || 'JARVIS NEXUS',
         content: chatData.response,
+        reasoning: chatData.reasoning,
+        sources: chatData.sources,
         timestamp: Date.now(),
       };
 
@@ -501,6 +509,8 @@ export default function App() {
           {activeTab === 'sandbox' && <SandboxView />}
 
           {activeTab === 'mcp' && <McpView />}
+          {activeTab === 'connectors' && <ConnectorsView />}
+          {activeTab === 'browser' && <BrowserView />}
         </Suspense>
       </main>
 
@@ -565,13 +575,13 @@ export default function App() {
 
           <button
             role="tab"
-            aria-selected={['repositories', 'memory', 'tools', 'providers', 'settings', 'prompt-forge', 'sandbox', 'mcp'].includes(activeTab)}
+            aria-selected={['repositories', 'memory', 'tools', 'providers', 'connectors', 'browser', 'settings', 'prompt-forge', 'sandbox', 'mcp'].includes(activeTab)}
             aria-label="Mais recursos e ferramentas"
             aria-haspopup="dialog"
             aria-expanded={isMoreMenuOpen}
             onClick={() => setIsMoreMenuOpen(true)}
             className={`min-h-[48px] flex flex-col items-center justify-center transition-colors focus:ring-2 focus:ring-cyan-400 focus:outline-none rounded-lg ${
-              ['repositories', 'memory', 'tools', 'providers', 'settings', 'prompt-forge', 'sandbox', 'mcp'].includes(activeTab)
+              ['repositories', 'memory', 'tools', 'providers', 'connectors', 'browser', 'settings', 'prompt-forge', 'sandbox', 'mcp'].includes(activeTab)
                 ? 'text-cyan-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -700,6 +710,34 @@ export default function App() {
                 <div>
                   <div className="font-semibold text-slate-100">Provedores IA</div>
                   <div className="text-[10px] text-slate-400">Gemini, Ollama, Local</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('connectors');
+                  setIsMoreMenuOpen(false);
+                }}
+                className="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/40 text-left flex items-center gap-2.5 transition-colors focus:ring-2 focus:ring-cyan-400 focus:outline-none"
+              >
+                <Link2 className="w-4 h-4 text-cyan-400" />
+                <div>
+                  <div className="font-semibold text-slate-100">Conectores</div>
+                  <div className="text-[10px] text-slate-400">GitHub, Gmail, IA</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('browser');
+                  setIsMoreMenuOpen(false);
+                }}
+                className="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/40 text-left flex items-center gap-2.5 transition-colors focus:ring-2 focus:ring-cyan-400 focus:outline-none"
+              >
+                <MonitorPlay className="w-4 h-4 text-emerald-400" />
+                <div>
+                  <div className="font-semibold text-slate-100">Navegador ao Vivo</div>
+                  <div className="text-[10px] text-slate-400">Co-browsing real</div>
                 </div>
               </button>
 

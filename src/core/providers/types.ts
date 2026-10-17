@@ -21,12 +21,23 @@ export interface ChatRequest {
   useWebSearch?: boolean;
 }
 
+export interface SourceRef {
+  /** Título da fonte encontrada na web (real, com link). */
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
 export interface ChatResponse {
   text: string;
   providerId: string;
   model: string;
   /** true se a resposta veio de um motor local (sem rede). */
   local: boolean;
+  /** Linha de raciocínio do modelo (reasoning_content / thinking), quando o provedor expõe. */
+  reasoning?: string;
+  /** Fontes reais usadas para compor a resposta (busca web). */
+  sources?: SourceRef[];
   /** Motivo do fallback, quando aplicável. */
   fallbackReason?: string;
 }

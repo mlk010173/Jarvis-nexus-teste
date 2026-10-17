@@ -37,6 +37,12 @@ export function heuristicChat(request: ChatRequest): string {
   return `Comando processado localmente pelo Heuristic Engine. Configure um provedor (Gemini, OpenRouter, Groq, NVIDIA NIM ou Ollama local) para respostas com LLM na nuvem.`;
 }
 
+/** Extrai e limpa a linha de raciocínio devolvida por modelos thinking (Kimi, DeepSeek, Grok reasoning). */
+export function extractReasoning(raw: string): string | undefined {
+  const trimmed = (raw ?? '').trim();
+  return trimmed ? trimmed : undefined;
+}
+
 class GeminiProvider implements LLMProvider {
   readonly id = 'gemini';
   readonly kind = 'gemini' as const;
@@ -121,12 +127,76 @@ class OpenAICompatibleProvider implements LLMProvider {
     }
 
     const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{ message?: { content?: string; reasoning_content?: string; reasoning?: string } }>;
     };
+    const rawMessage = data.choices?.[0]?.message;
     return {
-      text: data.choices?.[0]?.message?.content ?? '',
+      text: rawMessage?.content ?? '',
+      reasoning: extractReasoning(rawMessage?.reasoning_content ?? rawMessage?.reasoning ?? ''),
       providerId: this.id,
       model: this.model,
+      local: false,
+    };
+  }
+}
+
+/**
+ * Conector Base44 Superagent: o JARVIS vira interface remota de um
+ * Superagent real (memória persistente, ferramentas e conectores do
+ * agente dono). Autenticação por api_key no header, conforme API pública.
+ */
+class Base44SuperagentProvider implements LLMProvider {
+  readonly id = 'base44-superagent';
+  readonly kind = 'openai-compatible' as const;
+  private readonly apiKey: string;
+  private readonly agentId: string;
+  private readonly baseUrl: string;
+
+  constructor(apiKey: string, agentId: string, baseUrl: string) {
+    this.apiKey = apiKey;
+    this.agentId = agentId;
+    this.baseUrl = baseUrl;
+  }
+
+  isAvailable(): boolean {
+    return Boolean(this.apiKey && this.agentId);
+  }
+
+  /** Resolve (ou cria) a conversa padrão do agente e devolve o id do thread. */
+  private async getDefaultConversationId(): Promise<string> {
+    const res = await fetchWithTimeout(`${this.baseUrl}/api/agents/${this.agentId}/conversations`, {
+      headers: { api_key: this.apiKey },
+    });
+    if (!res.ok) throw new Error(`Base44 respondeu ${res.status} ao listar conversas.`);
+    const data = await res.json();
+    const id = data?.id ?? data?.conversation?.id ?? data?.conversations?.[0]?.id;
+    if (!id) throw new Error('Não foi possível resolver a conversa padrão do agente Base44.');
+    return String(id);
+  }
+
+  async chat(request: ChatRequest): Promise<ChatResponse> {
+    const conversationId = await this.getDefaultConversationId();
+    const last = request.messages[request.messages.length - 1]?.content ?? '';
+    const res = await fetchWithTimeout(
+      `${this.baseUrl}/api/agents/${this.agentId}/conversations/${conversationId}/messages`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', api_key: this.apiKey },
+        body: JSON.stringify({ message: last, context: request.systemInstruction }),
+      },
+      120_000,
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Base44 respondeu ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    const msg = data?.message ?? data?.data ?? data;
+    const text = msg?.content ?? msg?.text ?? data?.content ?? '';
+    return {
+      text: typeof text === 'string' ? text : JSON.stringify(text),
+      providerId: this.id,
+      model: 'superagent',
       local: false,
     };
   }
@@ -167,6 +237,13 @@ export function resolveProvider(opts: ResolveOptions): LLMProvider {
     return key ? new GeminiProvider(key, model) : new HeuristicProvider();
   }
 
+  if (entry.id === 'base44-superagent') {
+    const apiKey = process.env.BASE44_API_KEY;
+    const agentId = process.env.BASE44_AGENT_ID;
+    const baseUrl = (process.env.BASE44_API_BASE ?? 'https://api.base44.com').replace(/\/$/, '');
+    return apiKey && agentId ? new Base44SuperagentProvider(apiKey, agentId, baseUrl) : new HeuristicProvider();
+  }
+
   if (entry.kind === 'openai-compatible') {
     const apiKey =
       entry.id === 'ollama'
@@ -188,6 +265,8 @@ export function listProviderStatus() {
     let enabled = p.kind === 'heuristic';
     if (p.envKey) enabled = Boolean(process.env[p.envKey]);
     if (p.id === 'ollama') enabled = Boolean(process.env.OLLAMA_BASE_URL ?? true);
+    if (p.id === 'base44-superagent')
+      enabled = Boolean(process.env.BASE44_API_KEY && process.env.BASE44_AGENT_ID);
     return {
       id: p.id,
       name: p.name,

@@ -17,6 +17,8 @@ import {
 import { AutonomyLevel } from '../core/orchestrator/types.ts';
 import { StorageService, JarvisBackupBundle } from '../core/storage/storage-service.ts';
 import { useToast } from '../components/Toast.tsx';
+import { getApiBase, setApiBase, checkServerHealth, type HealthResult } from '../lib/api.ts';
+import { Cloud, Wifi, WifiOff } from 'lucide-react';
 
 interface SettingsViewProps {
   autonomyLevel: AutonomyLevel;
@@ -37,6 +39,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [speechPitch, setSpeechPitch] = useState(1.0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+  const [apiUrl, setApiUrlInput] = useState(getApiBase());
+  const [health, setHealth] = useState<HealthResult | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const testServer = async () => {
+    setChecking(true);
+    try {
+      setHealth(await checkServerHealth(getApiBase()));
+    } finally {
+      setChecking(false);
+    }
+  };
+
 
   const autonomyLevelsInfo: { level: AutonomyLevel; title: string; desc: string }[] = [
     {
@@ -342,6 +357,55 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           Salvar Preferências de Voz
         </button>
+      </div>
+
+      {/* Servidor Online ao Vivo */}
+      <div className="holo-card p-4 rounded-2xl space-y-3 border border-cyan-800/40">
+        <div className="flex items-center gap-2 text-cyan-400">
+          <Cloud className="w-4 h-4" />
+          <h2 className="text-sm font-bold">Servidor Online ao Vivo</h2>
+          {health?.online ? (
+            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+              <Wifi className="w-3 h-3" /> Online {health.latencyMs ? `· ${health.latencyMs}ms` : ''}
+            </span>
+          ) : health ? (
+            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
+              <WifiOff className="w-3 h-3" /> Offline
+            </span>
+          ) : null}
+        </div>
+        <p className="text-[11px] text-slate-400">
+          Endereço do servidor JARVIS rodando na nuvem (Render, Koyeb, Fly…). Vazio = modo local
+          (mesma origem). O chat, provedores, conectores e navegador usam este servidor ao vivo.
+        </p>
+        <input
+          type="url"
+          value={apiUrl}
+          onChange={(e) => setApiUrlInput(e.target.value)}
+          placeholder="https://jarvis-nexus.onrender.com"
+          className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setApiBase(apiUrl);
+              showToast(apiUrl ? 'Servidor ao vivo configurado!' : 'Voltou ao modo local.', 'success');
+            }}
+            className="flex-1 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold focus:ring-2 focus:ring-cyan-400 focus:outline-none"
+          >
+            Salvar Servidor
+          </button>
+          <button
+            onClick={testServer}
+            disabled={checking}
+            className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold disabled:opacity-50 focus:ring-2 focus:ring-cyan-400 focus:outline-none"
+          >
+            {checking ? 'Testando…' : 'Testar Conexão'}
+          </button>
+        </div>
+        {health && !health.online && health.error && (
+          <p className="text-[10px] text-rose-400">{health.error}</p>
+        )}
       </div>
 
       {/* Danger Zone */}
