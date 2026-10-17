@@ -12,6 +12,11 @@ import { webFetch, webSearch } from './src/core/tools/web-tools.ts';
 import { CONNECTOR_CATALOG } from './src/core/connectors/connectors-registry.ts';
 import { verifyConnectorCredentials } from './src/core/connectors/verify.ts';
 import { composeWakeMessage, shouldWakePass, WAKE_SYSTEM_INSTRUCTION } from './src/core/automation/wake.ts';
+import { liveNavigate, liveAct, isLiveBrowserAvailable } from './src/core/browser/live-browser.ts';
+import { scheduleJob, cancelJob, listJobs } from './src/core/automation/cron-service.ts';
+import { registerHook, listHooks, checkHookSecret, messageFromBody } from './src/core/automation/webhook-registry.ts';
+import { verifyMetaWebhook, parseIncomingWhatsApp, sendWhatsAppText, defaultRecipient } from './src/core/channels/whatsapp.ts';
+import { connectRemoteMcp } from './src/core/mcp/mcp-sdk-client.ts';
 
 dotenv.config();
 
@@ -447,6 +452,164 @@ app.post('/api/wake', aiRateLimitMiddleware, async (req: Request, res: Response)
     local: result.local,
     fallbackReason: result.fallbackReason,
   });
+});
+
+
+// Helper: roda o pipeline de wake sem HTTP (usado por cron, webhooks e canais).
+async function runWakePipeline(message: string, source: string): Promise<string> {
+  try {
+    const result = await chatWithFallback(
+      { messages: [{ role: 'user', content: message }], systemInstruction: `${WAKE_SYSTEM_INSTRUCTION}\nOrigem do gatilho: ${source}.` },
+      {},
+    );
+    return SecurityGuard.sanitizeOutput(result.text);
+  } catch (err) {
+    return `wake falhou: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
+// ===== Navegador ao vivo self-hosted (Playwright, open-source, sem chaves) =====
+app.post('/api/browser/live', async (req: Request, res: Response) => {
+  const { url } = req.body as { url?: string };
+  if (!url) {
+    res.status(400).json({ ok: false, error: 'URL obrigatória.' });
+    return;
+  }
+  const result = await liveNavigate(String(url));
+  if (!result.ok) {
+    res.status(result.available ? 502 : 503).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+app.post('/api/browser/live/act', async (req: Request, res: Response) => {
+  const { action, selector, text, key, dy } = req.body as {
+    action?: 'click' | 'type' | 'press' | 'scroll' | 'screenshot' | 'close';
+    selector?: string; text?: string; key?: string; dy?: number;
+  };
+  if (!action) {
+    res.status(400).json({ ok: false, error: 'Ação obrigatória (click|type|press|scroll|screenshot|close).' });
+    return;
+  }
+  const act =
+    action === 'click' ? { action, selector: String(selector ?? '') } as const :
+    action === 'type' ? { action, selector: String(selector ?? ''), text: String(text ?? '') } as const :
+    action === 'press' ? { action, key: String(key ?? 'Enter') } as const :
+    action === 'scroll' ? { action, dy: Number(dy ?? 600) } as const :
+    { action } as const;
+  const result = await liveAct(act);
+  if (!result.ok) {
+    res.status(result.available ? 502 : 503).json(result);
+    return;
+  }
+  res.json(result);
+});
+
+app.get('/api/browser/live/status', async (_req: Request, res: Response) => {
+  res.json({ available: await isLiveBrowserAvailable() });
+});
+
+// ===== Cron: agendamentos que acordam o agente (node-cron, free) =====
+app.get('/api/cron', (_req: Request, res: Response) => {
+  res.json({ jobs: listJobs() });
+});
+
+app.post('/api/cron', async (req: Request, res: Response) => {
+  const { id, schedule, message, source = 'cron' } = req.body as { id?: string; schedule?: string; message?: string; source?: string };
+  if (!schedule || !message) {
+    res.status(400).json({ error: 'schedule e message são obrigatórios.' });
+    return;
+  }
+  try {
+    const job = await scheduleJob(
+      id ?? `job-${Date.now().toString(36)}`,
+      String(schedule),
+      String(message),
+      (m, src) => runWakePipeline(m, src),
+      String(source),
+    );
+    res.json({ job });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : 'Agendamento inválido.' });
+  }
+});
+
+app.delete('/api/cron/:id', (req: Request, res: Response) => {
+  res.json({ removed: cancelJob(req.params.id) });
+});
+
+// ===== Webhooks genéricos: qualquer serviço externo acorda o JARVIS =====
+app.post('/api/webhooks', (req: Request, res: Response) => {
+  const { id, secret } = req.body as { id?: string; secret?: string };
+  if (!id || !/^[a-z0-9][a-z0-9-]{1,48}$/.test(id)) {
+    res.status(400).json({ error: 'id inválido (minúsculas, números e hífen; 2-49 chars).' });
+    return;
+  }
+  const hook = registerHook(id, secret);
+  res.json({ hook: { ...hook, secret: hook.secret ? '***' : undefined } });
+});
+
+app.get('/api/webhooks', (_req: Request, res: Response) => {
+  res.json({ hooks: listHooks() });
+});
+
+app.post('/api/webhooks/:hookId', async (req: Request, res: Response) => {
+  const { hookId } = req.params;
+  const check = checkHookSecret(hookId, req.get('x-hook-secret'));
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const source = String(body['source'] ?? `webhook:${hookId}`);
+  // dispara o agente sem prender quem chama ( resposta imediata, execução async)
+  runWakePipeline(messageFromBody(hookId, body), source).catch(() => undefined);
+  res.json({ ok: check.ok, hookId, received: true, note: check.ok ? 'evento aceito e agente acionado' : 'hook inexistente ou secret inválido — evento registrado' });
+});
+
+// ===== WhatsApp (Cloud API oficial + número do dono) =====
+app.get('/api/channels/whatsapp/webhook', (req: Request, res: Response) => {
+  const challenge = verifyMetaWebhook(req.query as Record<string, unknown>);
+  if (challenge) {
+    res.type('text/plain').send(challenge);
+    return;
+  }
+  res.status(403).send('verificação Meta falhou');
+});
+
+app.post('/api/channels/whatsapp/webhook', async (req: Request, res: Response) => {
+  const msgs = parseIncomingWhatsApp(req.body ?? {});
+  const allowed = (process.env.WHATSAPP_ALLOWED_FROM ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  for (const m of msgs) {
+    if (allowed.length && !allowed.includes(m.from)) continue;
+    const reply = await runWakePipeline(`Mensagem recebida no WhatsApp de ${m.from}: "${m.text}". Responda ao remetente de forma útil e curta.`, `whatsapp:${m.from}`);
+    const dest = allowed.length && allowed.includes(m.from) ? m.from : defaultRecipient();
+    if (dest) {
+      await sendWhatsAppText(dest, reply).catch(() => undefined);
+    }
+  }
+  res.json({ ok: true, processed: msgs.length });
+});
+
+app.post('/api/channels/whatsapp/send', async (req: Request, res: Response) => {
+  const { text, to } = req.body as { text?: string; to?: string };
+  if (!text?.trim()) {
+    res.status(400).json({ error: 'Texto obrigatório.' });
+    return;
+  }
+  const dest = defaultRecipient(to);
+  if (!dest) {
+    res.status(400).json({ error: 'Destinatário ausente: configure OWNER_WHATSAPP no servidor.' });
+    return;
+  }
+  res.json(await sendWhatsAppText(dest, String(text)));
+});
+
+// ===== MCP oficial: conectar a servidores remotos com o SDK @modelcontextprotocol/sdk =====
+app.post('/api/mcp/connect', async (req: Request, res: Response) => {
+  const { endpoint, headers } = req.body as { endpoint?: string; headers?: Record<string, string> };
+  if (!endpoint) {
+    res.status(400).json({ error: 'endpoint do servidor MCP é obrigatório (https://.../mcp).' });
+    return;
+  }
+  res.json(await connectRemoteMcp(String(endpoint), headers));
 });
 
 // ===== Conectores (fluxo Base44: autorização no site oficial + validação real) =====

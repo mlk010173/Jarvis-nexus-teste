@@ -156,5 +156,22 @@ curl -X POST https://SEU-SERVIDOR/api/wake \
 - Segurança: `WAKE_TOKEN` no ambiente exige o header `x-wake-token`; rate limit de IA aplicado
 - Exemplo completo de uso: workflow "Código GitHub no Gmail" em `superagent-clone/workflows/`
 
+---
+
+## 🔌 Ecossistema Ativo (implementado e testado ao vivo)
+
+| Recurso | Endpoint / Como | Status |
+|---|---|---|
+| Navegador ao vivo (self-host, open-source) | `POST /api/browser/live` + ações em `/act` — Playwright/Chromium real, mostra o **print da tela** | ✅ testado navegando e capturando screenshot |
+| Navegador compartilhável (nuvem) | `POST /api/browser/session` (Browserbase, opcional) | ✅ degrada honesto |
+| Cron (agendamentos acordam o agente) | `GET/POST/DELETE /api/cron` — node-cron free | ✅ testado CRUD |
+| Webhooks genéricos (n8n, GitHub, Typeform…) | `POST /api/webhooks/:id` com secret opcional | ✅ testado |
+| Wake (automações externas) | `POST /api/wake` (+ header x-wake-token) | ✅ testado |
+| WhatsApp Cloud API oficial | `POST /api/channels/whatsapp/send` + webhook Meta | ✅ erro honesto sem token; bridge local pronta |
+| WhatsApp local (seu número, sem Meta) | `cd bridges/whatsapp-web && npm i && npm start` → escaneie o QR | 📱 uma configuração no seu aparelho |
+| MCP SDK OFICIAL (@modelcontextprotocol/sdk) | `POST /api/mcp/connect {endpoint}` | ✅ conecta a servidores reais |
+| Terminal em nuvem | já existia: `POST /api/tools/shell` (SandboxView) com allowlist + SecurityGuard | ✅ |
+| n8n self-hosted | serviço `jarvis-n8n` no render.yaml (Docker, free) | 🚀 sobe junto no Render |
+
 **Estado atual do merge:** 72 testes verdes, `tsc --noEmit` limpo, build Vite ok,
 `/api/health` e `/api/wake` validados ao vivo com fallback offline (Heuristic Engine).
