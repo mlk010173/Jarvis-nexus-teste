@@ -1,0 +1,6 @@
+{
+  "name": "JARVIS NEXUS — Superagente Autônomo Open-Source",
+  "description": "Plataforma de IA multiagente autônoma, modular e open-source para celular com orquestrador, ferramentas e provedores locais/remotos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

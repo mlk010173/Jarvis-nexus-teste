@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0e7490" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#030712" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="#030712"/>
+  <circle cx="256" cy="256" r="215" fill="url(#bg)" stroke="url(#neon)" stroke-width="4" stroke-dasharray="16 8" opacity="0.6"/>
+  <!-- Helmet / Visor Shape -->
+  <path d="M150 230 C150 160 198 120 256 120 C314 120 362 160 362 230 C362 300 320 364 256 380 C192 364 150 300 150 230 Z" fill="none" stroke="url(#neon)" stroke-width="12" filter="url(#glow)"/>
+  <!-- Glowing Eye / Core Visor line -->
+  <path d="M192 235 Q256 260 320 235" stroke="#38bdf8" stroke-width="16" stroke-linecap="round" fill="none" filter="url(#glow)"/>
+  <circle cx="256" cy="245" r="14" fill="#ffffff" filter="url(#glow)"/>
+  <!-- Headset / Neural Ear nodes -->
+  <rect x="118" y="215" width="22" height="64" rx="10" fill="url(#neon)"/>
+  <rect x="372" y="215" width="22" height="64" rx="10" fill="url(#neon)"/>
+</svg>

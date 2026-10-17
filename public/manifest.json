@@ -1,0 +1,22 @@
+{
+  "short_name": "JARVIS",
+  "name": "JARVIS NEXUS — Superagente Autônomo Open-Source",
+  "description": "Superagente de IA autônomo, modular e open-source para celular",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#030712",
+  "theme_color": "#030712",
+  "display": "standalone",
+  "orientation": "portrait"
+}
