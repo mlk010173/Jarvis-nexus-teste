@@ -228,6 +228,26 @@ class HeuristicProvider implements LLMProvider {
   }
 }
 
+
+/**
+ * Escolhe automaticamente a melhor provedora habilitada no ambiente
+ * (usada quando o cliente não especifica providerId).
+ * Ordem de preferência: Gemini → xAI → OpenRouter → Groq → NVIDIA → Moonshot → Base44.
+ */
+function pickBestProviderId(): string {
+  const preference = ['gemini', 'xai', 'openrouter', 'groq', 'nvidia-nim', 'moonshot', 'base44-superagent'];
+  for (const id of preference) {
+    const e = findProviderCatalogEntry(id);
+    if (!e) continue;
+    if (id === 'base44-superagent') {
+      if (process.env.BASE44_API_KEY && process.env.BASE44_AGENT_ID) return id;
+      continue;
+    }
+    if (e.envKey && process.env[e.envKey]) return id;
+  }
+  return 'local-heuristic';
+}
+
 export interface ResolveOptions {
   providerId?: string;
   model?: string;
@@ -235,7 +255,7 @@ export interface ResolveOptions {
 
 /** Resolve um LLMProvider a partir da escolha do cliente + ambiente do servidor. */
 export function resolveProvider(opts: ResolveOptions): LLMProvider {
-  const entry = findProviderCatalogEntry(opts.providerId ?? 'local-heuristic');
+  const entry = findProviderCatalogEntry(opts.providerId ?? pickBestProviderId());
   if (!entry) return new HeuristicProvider();
 
   const model = opts.model && entry.models.includes(opts.model) ? opts.model : entry.defaultModel;
