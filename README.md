@@ -91,6 +91,10 @@ npm test
 
 ## Servidor Online ao Vivo
 
+**Instância ao vivo (grátis, Render):** https://jarvis-nexus-7b7q.onrender.com
+Frontend + API completos na mesma URL. No plano free o serviço dorme após ~15 min
+de inatividade e acorda em ~50s na primeira chamada.
+
 O JARVIS NEXUS tem dois modos de operação:
 
 1. **Local:** `npm run dev` sobe o servidor Express completo (frontend + API) em `http://localhost:3000`.
