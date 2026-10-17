@@ -1,0 +1,62 @@
+services:
+  ollama:
+    image: ollama/ollama
+    volumes: ["ollama:/root/.ollama"]
+    ports: ["11434:11434"]
+    # após subir: docker compose exec ollama ollama pull qwen2.5:14b
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: agent
+      POSTGRES_DB: agent
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    ports: ["5432:5432"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  agent-api:
+    build: ./agent-api
+    environment:
+      LLM_BASE_URL: http://ollama:11434/v1   # OpenAI-compat (Ollama)
+      LLM_MODEL: qwen2.5:14b
+      DATABASE_URL: postgresql://agent:agent@postgres:5432/agent
+      REDIS_URL: redis://redis:6379
+      SANDBOX_URL: http://sandbox:8001
+      WORKSPACE: /workspace
+      GMAIL_TOKEN: ${GITHUB_CODE_FROM_GMAIL_GMAIL_TOKEN:-}
+    depends_on: [ollama, postgres, redis, sandbox]
+    volumes: ["workspace:/workspace"]
+    ports: ["8000:8000"]
+
+  sandbox:
+    build: ./sandbox
+    volumes: ["workspace:/workspace"]
+    ports: ["8001:8001"]
+
+  whatsapp-bridge:
+    build: ./bridges/whatsapp
+    environment:
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}
+      VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-superagent}
+      AGENT_URL: http://agent-api:8000
+    ports: ["8002:8002"]
+
+  telegram-bridge:
+    build: ./bridges/telegram
+    environment:
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
+      AGENT_URL: http://agent-api:8000
+    ports: ["8003:8003"]
+
+  chat-ui:
+    build: ./frontend
+    environment:
+      AGENT_URL: http://agent-api:8000
+    ports: ["3000:3000"]
+
+volumes: { ollama: {}, pgdata: {}, workspace: {} }

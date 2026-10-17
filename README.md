@@ -120,3 +120,17 @@ Funciona em Fly.io, Koyeb, Railway, VPS ou Termux com proot.
 Na aba **Configurações > Servidor Online ao Vivo**, cole a URL do serviço (ex.: `https://jarvis-nexus.onrender.com`) e toque em *Testar Conexão*. O app mede a latência real e mostra o status. Para voltar ao modo local, deixe o campo vazio.
 
 > Nota: no plano gratuito do Render o servidor "dorme" após 15 min sem uso e acorda em ~50s na primeira chamada. O health check do app mostra o status real, sem fingir.
+
+---
+
+## 🤖 Superagent Clone (open-source, custo zero)
+
+Pasta [`superagent-clone/`](./superagent-clone/) — núcleo funcional do clone do Superagent Base44:
+runtime do agente (loop LLM ⇄ tools), sandbox isolado, memória durável,
+bridges WhatsApp/Telegram, chat web e docker-compose completo (Ollama + Postgres + Redis).
+
+**Documentação:**
+- [`docs/blueprint-superagent.md`](./docs/blueprint-superagent.md) — identidade, prompt avançado e mapa pago → free → open-source
+- [`docs/blueprint-superagent-integracao-profunda.md`](./docs/blueprint-superagent-integracao-profunda.md) — backend + frontend + todos os formatos de arquivo
+
+Subir: `cd superagent-clone && docker compose up -d` (após `ollama pull qwen2.5:14b`).
