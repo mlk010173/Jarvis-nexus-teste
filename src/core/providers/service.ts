@@ -143,7 +143,7 @@ class OpenAICompatibleProvider implements LLMProvider {
 /**
  * Conector Base44 Superagent: o JARVIS vira interface remota de um
  * Superagent real (memória persistente, ferramentas e conectores do
- * agente dono). Autenticação por api_key no header, conforme API pública.
+ * agente dono). Autenticação por Bearer token, conforme API pública.
  */
 class Base44SuperagentProvider implements LLMProvider {
   readonly id = 'base44-superagent';
@@ -164,12 +164,18 @@ class Base44SuperagentProvider implements LLMProvider {
 
   /** Resolve (ou cria) a conversa padrão do agente e devolve o id do thread. */
   private async getDefaultConversationId(): Promise<string> {
+    // POST cria ou devolve a conversa padrão do agente (API pública Base44).
     const res = await fetchWithTimeout(`${this.baseUrl}/api/agents/${this.agentId}/conversations`, {
-      headers: { api_key: this.apiKey },
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({}),
     });
-    if (!res.ok) throw new Error(`Base44 respondeu ${res.status} ao listar conversas.`);
+    if (!res.ok) throw new Error(`Base44 respondeu ${res.status} ao resolver a conversa padrão.`);
     const data = await res.json();
-    const id = data?.id ?? data?.conversation?.id ?? data?.conversations?.[0]?.id;
+    const id = data?.id ?? data?.conversation?.id ?? (Array.isArray(data) ? data[0]?.id : undefined);
     if (!id) throw new Error('Não foi possível resolver a conversa padrão do agente Base44.');
     return String(id);
   }
@@ -181,8 +187,11 @@ class Base44SuperagentProvider implements LLMProvider {
       `${this.baseUrl}/api/agents/${this.agentId}/conversations/${conversationId}/messages`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', api_key: this.apiKey },
-        body: JSON.stringify({ message: last, context: request.systemInstruction }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ content: last }),
       },
       120_000,
     );
@@ -191,8 +200,7 @@ class Base44SuperagentProvider implements LLMProvider {
       throw new Error(`Base44 respondeu ${res.status}: ${body.slice(0, 200)}`);
     }
     const data = await res.json();
-    const msg = data?.message ?? data?.data ?? data;
-    const text = msg?.content ?? msg?.text ?? data?.content ?? '';
+    const text = data?.content ?? data?.message?.content ?? data?.text ?? '';
     return {
       text: typeof text === 'string' ? text : JSON.stringify(text),
       providerId: this.id,
@@ -240,7 +248,7 @@ export function resolveProvider(opts: ResolveOptions): LLMProvider {
   if (entry.id === 'base44-superagent') {
     const apiKey = process.env.BASE44_API_KEY;
     const agentId = process.env.BASE44_AGENT_ID;
-    const baseUrl = (process.env.BASE44_API_BASE ?? 'https://api.base44.com').replace(/\/$/, '');
+    const baseUrl = (process.env.BASE44_API_BASE ?? 'https://app.base44.com').replace(/\/$/, '');
     return apiKey && agentId ? new Base44SuperagentProvider(apiKey, agentId, baseUrl) : new HeuristicProvider();
   }
 

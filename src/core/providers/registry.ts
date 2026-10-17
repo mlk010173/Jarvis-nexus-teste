@@ -110,7 +110,7 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
       'Conecta o JARVIS a um agente Base44 Superagent pela API oficial (api_key). Configure BASE44_AGENT_ID, BASE44_API_KEY e BASE44_API_BASE no servidor.',
     isLocal: false,
     envKey: 'BASE44_API_KEY',
-    baseUrl: 'https://api.base44.com',
+    baseUrl: 'https://app.base44.com',
     defaultModel: 'superagent',
     models: ['superagent'],
     costNotes:
