@@ -23,8 +23,8 @@ import { AgentProfile } from '../core/orchestrator/types.ts';
 interface AgentsViewProps {
   agents: AgentProfile[];
   onSelectAgent: (agent: AgentProfile) => void;
-  onCreateAgent: (agent: AgentProfile) => void;
-  onRunAgentDirectly: (agent: AgentProfile) => void;
+  onCreateAgent?: (agent: AgentProfile) => void;
+  onRunAgentDirectly?: (agent: AgentProfile) => void;
 }
 
 // Icon mapping helper
@@ -90,7 +90,7 @@ export const AgentsView: React.FC<AgentsViewProps> = ({
       },
     };
 
-    onCreateAgent(newAgent);
+    onCreateAgent?.(newAgent);
     setIsCreatingModalOpen(false);
     setCustomName('');
     setCustomTitle('');
@@ -184,7 +184,7 @@ export const AgentsView: React.FC<AgentsViewProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onRunAgentDirectly(agent);
+                    onRunAgentDirectly?.(agent);
                   }}
                   className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-cyan-500/20 text-cyan-300 flex items-center gap-1 text-[11px] font-semibold transition-colors"
                 >
@@ -271,7 +271,7 @@ export const AgentsView: React.FC<AgentsViewProps> = ({
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => {
-                  onRunAgentDirectly(selectedAgent);
+                  onRunAgentDirectly?.(selectedAgent);
                   setSelectedAgent(null);
                 }}
                 className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold hover:brightness-110 flex items-center justify-center gap-2 text-xs transition-all"

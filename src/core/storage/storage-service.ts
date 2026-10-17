@@ -26,7 +26,8 @@ export class StorageService {
     AUTONOMY: 'jarvis_autonomy_level',
     THEME: 'jarvis_theme',
     SOUND: 'jarvis_sound_enabled',
-    AGENTS: 'jarvis_custom_agents',
+    AGENTS: 'jarvis_custom_agents',    PROVIDER: 'jarvis.nexus.provider',
+    MODEL: 'jarvis.nexus.model',
   };
 
   /**
@@ -166,6 +167,24 @@ export class StorageService {
   /**
    * Generate complete backup bundle as JSON string
    */
+  static saveProvider(providerId: string): void {
+    try { localStorage.setItem(this.KEYS.PROVIDER, providerId); } catch { /* SSR/privado */ }
+  }
+
+  static loadProvider(fallback = 'local-heuristic'): string {
+    if (typeof window === 'undefined') return fallback;
+    try { return localStorage.getItem(this.KEYS.PROVIDER) || fallback; } catch { return fallback; }
+  }
+
+  static saveModel(model: string): void {
+    try { localStorage.setItem(this.KEYS.MODEL, model); } catch { /* SSR/privado */ }
+  }
+
+  static loadModel(fallback = ''): string {
+    if (typeof window === 'undefined') return fallback;
+    try { return localStorage.getItem(this.KEYS.MODEL) || fallback; } catch { return fallback; }
+  }
+
   static exportFullBackup(extraData: {
     autonomyLevel: AutonomyLevel;
     theme: 'dark' | 'light' | 'system';

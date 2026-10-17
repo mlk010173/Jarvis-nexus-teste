@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { ExecutionPlan } from '../core/orchestrator/types.ts';
 import { HolographicCore } from '../components/HolographicCore.tsx';
 import {
   MessageSquare,
@@ -21,10 +22,13 @@ import {
 
 interface HomeViewProps {
   onNavigate: (tab: string) => void;
-  onSendGoal: (goal: string) => void;
-  onStartVoice: () => void;
-  isListening: boolean;
-  activeProvider: string;
+  onSendGoal?: (goal: string) => void;
+  onStartVoice?: () => void;
+  isListening?: boolean;
+  activeProvider?: string;
+  onSendMessage?: (text: string) => void;
+  onToggleVoice?: () => void;
+  currentPlan?: ExecutionPlan | null;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -39,7 +43,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const handleQuickSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!goalInput.trim()) return;
-    onSendGoal(goalInput);
+    onSendGoal?.(goalInput);
     setGoalInput('');
   };
 
@@ -57,7 +61,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <HolographicCore
           state={isListening ? 'listening' : 'idle'}
           size="md"
-          onClick={onStartVoice}
+          onClick={() => onStartVoice?.()}
         />
 
         <div className="mt-4">
@@ -80,7 +84,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="relative flex items-center bg-slate-900/90 rounded-2xl border border-cyan-500/30 focus-within:border-cyan-400 focus-within:shadow-[0_0_20px_rgba(6,182,212,0.25)] transition-all overflow-hidden p-1.5">
           <button
             type="button"
-            onClick={onStartVoice}
+            onClick={() => onStartVoice?.()}
             aria-label="Ativar comando por voz"
             className={`p-3 rounded-xl transition-all ${
               isListening
@@ -115,7 +119,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <button
               key={i}
               type="button"
-              onClick={() => onSendGoal(prompt)}
+              onClick={() => onSendGoal?.(prompt)}
               className="text-[11px] whitespace-nowrap px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-cyan-500/40 text-slate-300 hover:text-cyan-300 transition-colors"
             >
               <Sparkles className="w-3 h-3 inline mr-1 text-cyan-400" />

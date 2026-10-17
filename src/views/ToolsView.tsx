@@ -16,6 +16,54 @@ import { TOOLS_CATALOG, executeTool } from '../core/tools/tools-registry.ts';
 import { ToolDefinition, ToolExecutionResult } from '../core/tools/types.ts';
 import { useDebounce } from '../hooks/useDebounce.ts';
 
+/**
+ * Ferramentas de rede/shell executam no SERVIDOR (CORS e sandbox):
+ * roteia para os endpoints reais e cai para execução local se a API
+ * estiver inacessível (ex.: preview estático no GitHub Pages).
+ */
+const SERVER_ROUTES: Record<string, string> = {
+  web_search: '/api/tools/search',
+  web_fetch: '/api/tools/fetch',
+  shell_exec: '/api/tools/shell',
+  code_eval: '/api/tools/code-eval',
+};
+
+async function runToolWithRouting(
+  toolName: string,
+  params: Record<string, string>,
+): Promise<ToolExecutionResult> {
+  const startTime = Date.now();
+  const route = SERVER_ROUTES[toolName];
+  if (route) {
+    try {
+      const res = await fetch(route, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      const data = await res.json();
+      if (!res.ok && !data.success) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      return {
+        toolName,
+        success: res.ok && (data.success ?? data.allowed ?? true),
+        output: data,
+        durationMs: Date.now() - startTime,
+      };
+    } catch (err) {
+      return {
+        toolName,
+        success: false,
+        output: null,
+        error: `${err instanceof Error ? err.message : String(err)} — servidor offline? No GitHub Pages (preview estático) as ferramentas de rede/shell exigem o backend rodando (npm start).`,
+        durationMs: Date.now() - startTime,
+      };
+    }
+  }
+  return executeTool(toolName, params);
+}
+
 export const ToolsView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTool, setSelectedTool] = useState<ToolDefinition | null>(null);
@@ -53,7 +101,7 @@ export const ToolsView: React.FC = () => {
     setExecutionResult(null);
 
     try {
-      const res = await executeTool(selectedTool.name, paramValues);
+      const res = await runToolWithRouting(selectedTool.name, paramValues);
       setExecutionResult(res);
     } finally {
       setIsRunning(false);

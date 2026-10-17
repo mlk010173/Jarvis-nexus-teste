@@ -74,7 +74,9 @@ export default function App() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [hasGeminiKey, setHasGeminiKey] = useState(true);
-  const [activeProvider, setActiveProvider] = useState('Google Gemini 3.8 Flash');
+  const [activeProviderId, setActiveProviderId] = useState<string>(() => StorageService.loadProvider('local-heuristic'));
+  const [activeModel, setActiveModel] = useState<string>(() => StorageService.loadModel(''));
+  const [activeProvider, setActiveProvider] = useState('JARVIS Local Heuristic Engine');
   const [isOnline, setIsOnline] = useState(true);
 
   const { showToast } = useToast();
@@ -260,6 +262,8 @@ export default function App() {
           message: text,
           agentId: 'nexus-orchestrator',
           history: messages.slice(-5),
+          providerId: activeProviderId,
+          model: activeModel,
         }),
       });
 
@@ -407,9 +411,12 @@ export default function App() {
           {activeTab === 'home' && (
             <HomeView
               onNavigate={(tab) => setActiveTab(tab)}
+              onSendGoal={handleSendMessage}
+              onStartVoice={isListening ? stopListening : startListening}
               onSendMessage={handleSendMessage}
               isListening={isListening}
               onToggleVoice={isListening ? stopListening : startListening}
+              activeProvider={activeProvider}
               currentPlan={currentPlan}
             />
           )}
@@ -421,6 +428,8 @@ export default function App() {
               isLoading={isLoading}
               isListening={isListening}
               onToggleVoice={isListening ? stopListening : startListening}
+              activePlan={currentPlan}
+              onNavigateToProjects={() => setActiveTab('projects')}
               autonomyLevel={autonomyLevel}
               onClearChat={() => {
                 setMessages([INITIAL_GREETING_MESSAGE]);
@@ -458,9 +467,15 @@ export default function App() {
 
           {activeTab === 'providers' && (
             <ProvidersView
-              activeProvider={activeProvider}
-              onSelectProvider={setActiveProvider}
-              hasGeminiKey={hasGeminiKey}
+              activeProviderId={activeProviderId}
+              activeModel={activeModel}
+              onSelectProvider={(providerId, model) => {
+                setActiveProviderId(providerId);
+                setActiveModel(model);
+                StorageService.saveProvider(providerId);
+                StorageService.saveModel(model);
+                showToast(`Provedor ativo: ${providerId} (${model})`, 'success');
+              }}
             />
           )}
 

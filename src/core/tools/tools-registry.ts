@@ -1,4 +1,5 @@
 import type { ToolDefinition, ToolExecutionResult } from './types.ts';
+import { webFetch, webSearch } from './web-tools.ts';
 
 export const TOOLS_CATALOG: ToolDefinition[] = [
   {
@@ -108,6 +109,29 @@ export const TOOLS_CATALOG: ToolDefinition[] = [
     ],
     requiresApproval: false,
     isLocal: true
+  },
+  {
+    name: 'web_fetch',
+    category: 'web',
+    title: 'Navegador & Leitor de Páginas',
+    description: 'Baixa uma URL pública real e extrai o texto legível (sem scripts/anúncios) para análise.',
+    parameters: [
+      { name: 'url', type: 'string', description: 'URL pública (http/https) a ler', required: true }
+    ],
+    requiresApproval: false,
+    isLocal: false
+  },
+  {
+    name: 'shell_exec',
+    category: 'system',
+    title: 'Terminal Sandbox',
+    description: 'Executa comandos reais no servidor com allowlist de binários, bloqueio de padrões destrutivos, timeout e limite de saída.',
+    parameters: [
+      { name: 'command', type: 'string', description: 'Comando único (sem pipes/;&&) — ex: git status, node -v', required: true }
+    ],
+    requiresApproval: true,
+    isLocal: true,
+    sideEffects: 'Executa processos reais no servidor (sandbox com allowlist e timeout de 10-20s).'
   },
   {
     name: 'system_diagnostics',
@@ -305,31 +329,65 @@ CMD ["node", "server.js"]`;
 
       case 'web_search': {
         const query = String(args.query || '');
-        // Search against curated dev docs and return relevant insights
-        const matches = CURATED_REPOSITORIES.filter(r => 
-          r.name.toLowerCase().includes(query.toLowerCase()) ||
-          r.description.toLowerCase().includes(query.toLowerCase()) ||
-          r.tags.some(t => t.includes(query.toLowerCase()))
-        );
+        // Busca REAL via DuckDuckGo (sem chave). Se a rede falhar,
+        // cai para o catálogo curado com flag explícita de fallback.
+        try {
+          const items = await webSearch(query);
+          return {
+            toolName,
+            success: true,
+            output: { query, mode: 'live', totalResults: items.length, items },
+            durationMs: Date.now() - startTime
+          };
+        } catch (networkErr) {
+          const q = query.toLowerCase();
+          const matches = CURATED_REPOSITORIES.filter(r =>
+            r.name.toLowerCase().includes(q) ||
+            r.description.toLowerCase().includes(q) ||
+            r.tags.some(t => t.includes(q))
+          );
+          return {
+            toolName,
+            success: true,
+            output: {
+              query,
+              mode: 'curated_fallback',
+              fallbackReason: networkErr instanceof Error ? networkErr.message : String(networkErr),
+              totalResults: matches.length,
+              items: matches.map(r => ({
+                title: r.name,
+                url: r.url,
+                snippet: r.description
+              }))
+            },
+            durationMs: Date.now() - startTime
+          };
+        }
+      }
+
+      case 'web_fetch': {
+        const url = String(args.url || '');
+        const page = await webFetch(url);
         return {
           toolName,
           success: true,
-          output: {
-            query,
-            totalResults: matches.length > 0 ? matches.length : 3,
-            items: matches.length > 0 ? matches : [
-              {
-                title: `Documentação Oficial: ${query}`,
-                url: `https://developer.mozilla.org/search?q=${encodeURIComponent(query)}`,
-                snippet: `Resultados técnicos e padrões abertos para integração de ${query}.`
-              },
-              {
-                title: `Repositórios Open-Source: ${query}`,
-                url: `https://github.com/search?q=${encodeURIComponent(query)}`,
-                snippet: `Soluções comunitárias, licença MIT/Apache e pacotes npm verificados.`
-              }
-            ]
-          },
+          output: page,
+          durationMs: Date.now() - startTime
+        };
+      }
+
+      case 'shell_exec': {
+        // Import dinâmico: child_process só existe no servidor.
+        const { executeShell } = await import('./shell.ts');
+        const command = String(args.command || '');
+        const result = await executeShell({ command }, process.cwd());
+        if (!result.allowed) {
+          throw new Error(result.blockedReason ?? 'Comando bloqueado.');
+        }
+        return {
+          toolName,
+          success: result.exitCode === 0 && !result.timedOut,
+          output: result,
           durationMs: Date.now() - startTime
         };
       }

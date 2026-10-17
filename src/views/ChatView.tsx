@@ -22,15 +22,17 @@ interface ChatViewProps {
   onSendMessage: (text: string) => Promise<void>;
   isLoading: boolean;
   isListening: boolean;
-  onToggleVoiceInput: () => void;
-  onSpeak: (text: string) => void;
-  onCancelSpeech: () => void;
-  isSpeaking: boolean;
-  activePlan: ExecutionPlan | null;
-  onNavigateToProjects: () => void;
+  onToggleVoice?: () => void;
+  onToggleVoiceInput?: () => void;
+  onSpeak?: (text: string) => void;
+  onCancelSpeech?: () => void;
+  isSpeaking?: boolean;
+  activePlan?: ExecutionPlan | null;
+  onNavigateToProjects?: () => void;
+  autonomyLevel?: 1 | 2 | 3 | 4 | 5;
   onClearChat: () => void;
-  onApproveAction: (actionId: string) => void;
-  onRejectAction: (actionId: string) => void;
+  onApproveAction?: (actionId: string) => void;
+  onRejectAction?: (actionId: string) => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -100,7 +102,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <button
               onClick={() => {
                 const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
-                if (lastAssistant) onSpeak(lastAssistant.content);
+                if (lastAssistant) onSpeak?.(lastAssistant.content);
               }}
               title="Ouvir última resposta"
               className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-cyan-300 transition-colors"
@@ -215,14 +217,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => onApproveAction(activePlan.pendingApprovalAction!.subtaskId)}
+                onClick={() => onApproveAction?.(activePlan.pendingApprovalAction!.subtaskId)}
                 className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center justify-center gap-1 transition-colors"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>Aprovar Execução</span>
               </button>
               <button
-                onClick={() => onRejectAction(activePlan.pendingApprovalAction!.subtaskId)}
+                onClick={() => onRejectAction?.(activePlan.pendingApprovalAction!.subtaskId)}
                 className="flex-1 py-1.5 px-3 rounded-lg bg-rose-900/80 hover:bg-rose-800 text-rose-200 font-semibold flex items-center justify-center gap-1 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
