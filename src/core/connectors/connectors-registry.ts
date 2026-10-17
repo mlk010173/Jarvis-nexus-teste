@@ -19,6 +19,7 @@ export type VerifyKind =
   | 'telegram-getme' // GET https://api.telegram.org/bot<token>/getMe
   | 'models-list' // Bearer em GET baseUrl/models (chaves de provedores de IA)
   | 'gmail-profile' // Bearer em GET gmail/v1/users/me/profile
+  | 'gmail-imap' // Login IMAP real (e-mail + senha de app) via imapflow no servidor
   | 'base44-agent' // api_key em GET /api/agents/<id>/conversations
   | 'ollama-tags'; // GET baseUrl/api/tags sem auth (servidor local)
 
@@ -27,6 +28,8 @@ export interface ConnectorSpec {
   name: string;
   category: ConnectorCategory;
   description: string;
+  /** Variáveis de ambiente do servidor que habilitam o conector. */
+  envKeys?: string[];
   /** Página oficial onde o usuário cria/autoriza a credencial. */
   officialUrl: string;
   docsUrl: string;
@@ -90,6 +93,23 @@ export const CONNECTOR_CATALOG: ConnectorSpec[] = [
     ],
     tokenLabel: 'Access token OAuth (ya29.…)',
     verify: { kind: 'gmail-profile', baseUrl: 'https://gmail.googleapis.com/gmail/v1' },
+  },
+  {
+    id: 'gmail-imap',
+    name: 'Gmail (senha de app)',
+    category: 'mensageria',
+    description:
+      'Leitura e envio de e-mail do Gmail direto pelo servidor (IMAP + SMTP), sem projeto no Google Cloud. Usa uma senha de app criada na sua conta Google.',
+    officialUrl: 'https://myaccount.google.com/apppasswords',
+    docsUrl: 'https://support.google.com/accounts/answer/185833',
+    howTo: [
+      'Na conta Google, ative a verificação em duas etapas (Segurança > Verificação em duas etapas).',
+      'Crie uma senha de app em myaccount.google.com/apppasswords (ex.: "Jarvis Nexus").',
+      'No servidor, defina GMAIL_USER (seu e-mail) e GMAIL_APP_PASSWORD (a senha de app de 16 letras) — ou valide aqui colando a senha.',
+    ],
+    tokenLabel: 'Senha de app (16 letras, ex.: abcd efgh ijkl mnop)',
+    envKeys: ['GMAIL_USER', 'GMAIL_APP_PASSWORD'],
+    verify: { kind: 'gmail-imap', baseUrl: 'imap.gmail.com' },
   },
   {
     id: 'telegram',

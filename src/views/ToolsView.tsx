@@ -26,6 +26,8 @@ const SERVER_ROUTES: Record<string, string> = {
   web_fetch: '/api/tools/fetch',
   shell_exec: '/api/tools/shell',
   code_eval: '/api/tools/code-eval',
+  email_inbox: '/api/tools/email/inbox',
+  email_send: '/api/tools/email/send',
 };
 
 async function runToolWithRouting(

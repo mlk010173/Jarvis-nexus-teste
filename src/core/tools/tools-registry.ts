@@ -134,6 +134,32 @@ export const TOOLS_CATALOG: ToolDefinition[] = [
     sideEffects: 'Executa processos reais no servidor (sandbox com allowlist e timeout de 10-20s).'
   },
   {
+    name: 'email_inbox',
+    category: 'web',
+    title: 'Caixa de Entrada (Gmail IMAP)',
+    description: 'Lista as mensagens mais recentes do Gmail do usuário (assunto, remetente, data e trecho).',
+    parameters: [
+      { name: 'limit', type: 'string', description: 'Quantidade de mensagens (padrão 10, máx 25)', required: false }
+    ],
+    requiresApproval: false,
+    isLocal: false,
+    sideEffects: 'Somente leitura no servidor (IMAP read-only, não marca como lido).'
+  },
+  {
+    name: 'email_send',
+    category: 'web',
+    title: 'Enviar E-mail (Gmail SMTP)',
+    description: 'Envia um e-mail pela conta Gmail configurada no servidor.',
+    parameters: [
+      { name: 'to', type: 'string', description: 'Endereço do destinatário', required: true },
+      { name: 'subject', type: 'string', description: 'Assunto do e-mail', required: true },
+      { name: 'body', type: 'string', description: 'Corpo do e-mail (texto simples)', required: true }
+    ],
+    requiresApproval: true,
+    isLocal: false,
+    sideEffects: 'Envia um e-mail real pela conta Gmail do servidor (SMTP TLS).'
+  },
+  {
     name: 'system_diagnostics',
     category: 'system',
     title: 'Diagnóstico do Sistema',

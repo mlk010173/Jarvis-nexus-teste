@@ -64,6 +64,32 @@ export async function verifyConnectorCredentials(
         if (!res.ok || data?.ok !== true) return { ok: false, error: 'Telegram rejeitou o token (getMe falhou).' };
         return { ok: true, identity: `@${data.result.username}`, detail: data.result.first_name };
       }
+      case 'gmail-imap': {
+        // Login IMAP real via imapflow (só existe no servidor).
+        const user = (extra || '').trim() || process.env.GMAIL_USER || '';
+        if (!user) return { ok: false, error: 'Informe o e-mail da conta Gmail (campo extra ou GMAIL_USER no servidor).' };
+        if (!token || token.replace(/\s/g, '').length !== 16) {
+          return { ok: false, error: 'Senha de app do Gmail deve ter 16 letras (myaccount.google.com/apppasswords).' };
+        }
+        try {
+          const { ImapFlow } = await import('imapflow');
+          const client = new ImapFlow({
+            host: 'imap.gmail.com',
+            port: 993,
+            secure: true,
+            auth: { user, pass: token.replace(/\s/g, '') },
+            logger: false,
+          });
+          await client.connect();
+          const lock = await client.getMailboxLock('INBOX');
+          const total = (client.mailbox && typeof client.mailbox === 'object' ? client.mailbox.exists : 0) ?? 0;
+          lock.release();
+          await client.logout();
+          return { ok: true, identity: user, detail: `Login IMAP OK — caixa de entrada com ${total} mensagens.` };
+        } catch (err) {
+          return { ok: false, error: `IMAP Gmail: ${err instanceof Error ? err.message : String(err)}` };
+        }
+      }
       case 'gmail-profile': {
         const { res, data } = await jsonFetch(`${spec.verify.baseUrl}/users/me/profile`, bearer);
         if (!res.ok) return { ok: false, error: `Gmail respondeu ${res.status}. Token OAuth inválido/expirado.` };

@@ -167,6 +167,93 @@ app.post('/api/tools/shell', async (req: Request, res: Response) => {
   res.json(result);
 });
 
+// ===== E-mail real (Gmail via senha de app) =====
+const GMAIL_USER = process.env.GMAIL_USER || '';
+const GMAIL_APP_PASSWORD = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s/g, '');
+
+function gmailEnvError(res: Response): void {
+  res.status(503).json({
+    success: false,
+    error:
+      'E-mail não configurado no servidor: defina GMAIL_USER e GMAIL_APP_PASSWORD (senha de app de 16 letras, myaccount.google.com/apppasswords).',
+  });
+}
+
+app.post('/api/tools/email/inbox', async (req: Request, res: Response) => {
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) return gmailEnvError(res);
+  const limit = Math.min(Math.max(parseInt(String(req.body?.limit ?? '10'), 10) || 10, 1), 25);
+  try {
+    const { ImapFlow } = await import('imapflow');
+    const client = new ImapFlow({
+      host: 'imap.gmail.com',
+      port: 993,
+      secure: true,
+      auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+      logger: false,
+    });
+    await client.connect();
+    const lock = await client.getMailboxLock('INBOX');
+    try {
+      const total = (client.mailbox && typeof client.mailbox === 'object' ? client.mailbox.exists : 0) ?? 0;
+      const start = Math.max(total - limit + 1, 1);
+      const messages: Array<Record<string, unknown>> = [];
+      for await (const msg of client.fetch(`${start}:*`, {
+        envelope: true,
+        flags: true,
+        bodyStructure: true,
+        headers: true,
+        uid: true,
+      })) {
+        messages.push({
+          uid: msg.uid,
+          from: msg.envelope?.from?.[0]?.address ?? '',
+          fromName: msg.envelope?.from?.[0]?.name ?? '',
+          subject: msg.envelope?.subject ?? '(sem assunto)',
+          date: msg.envelope?.date ?? null,
+          seen: msg.flags?.has('\\Seen') ?? false,
+        });
+      }
+      res.json({ success: true, totalInInbox: total, count: messages.length, messages: messages.reverse() });
+    } finally {
+      lock.release();
+      try { await client.logout(); } catch { /* noop */ }
+    }
+  } catch (err) {
+    res.status(502).json({ success: false, error: `IMAP Gmail: ${err instanceof Error ? err.message : String(err)}` });
+  }
+});
+
+app.post('/api/tools/email/send', async (req: Request, res: Response) => {
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) return gmailEnvError(res);
+  const { to, subject, body } = req.body as { to?: string; subject?: string; body?: string };
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    res.status(400).json({ success: false, error: 'Destinatário (to) inválido.' });
+    return;
+  }
+  if (!subject?.trim() || !body?.trim()) {
+    res.status(400).json({ success: false, error: 'Assunto e corpo são obrigatórios.' });
+    return;
+  }
+  try {
+    const nodemailer = await import('nodemailer');
+    const transport = nodemailer.default.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+    });
+    const info = await transport.sendMail({
+      from: `\"JARVIS Nexus\" <${GMAIL_USER}>`,
+      to,
+      subject: subject.trim(),
+      text: body,
+    });
+    res.json({ success: true, messageId: info.messageId, accepted: info.accepted });
+  } catch (err) {
+    res.status(502).json({ success: false, error: `SMTP Gmail: ${err instanceof Error ? err.message : String(err)}` });
+  }
+});
+
 app.get('/api/tools/shell/validate', (req: Request, res: Response) => {
   const command = String(req.query.command || '');
   res.json(validateShellCommand(command));
