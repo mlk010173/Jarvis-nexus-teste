@@ -134,3 +134,27 @@ bridges WhatsApp/Telegram, chat web e docker-compose completo (Ollama + Postgres
 - [`docs/blueprint-superagent-integracao-profunda.md`](./docs/blueprint-superagent-integracao-profunda.md) — backend + frontend + todos os formatos de arquivo
 
 Subir: `cd superagent-clone && docker compose up -d` (após `ollama pull qwen2.5:14b`).
+
+---
+
+## ⏰ Endpoint de Wake (automações acordam o JARVIS)
+
+`POST /api/wake` — qualquer automação externa (n8n, cron, webhook de canal, outro agente)
+acorda o Nexus Orchestrator com uma instrução operacional:
+
+```bash
+curl -X POST https://SEU-SERVIDOR/api/wake \
+  -H 'Content-Type: application/json' \
+  -H 'x-wake-token: SEU_TOKEN'   # só se WAKE_TOKEN estiver definido no servidor
+  -d '{"message":"Leia os e-mails novos do GitHub e envie o código de verificação ao dono.","source":"gmail-github-watch","context":{"ids":["abc123"]}}'
+```
+
+- `message`: instrução operacional (o agente executa com as ferramentas disponíveis)
+- `source`: origem do gatilho (`n8n`, `cron`, `whatsapp`, etc.)
+- `context`: dados do gatilho, injetados como CONTEXTO DO GATILHO (truncado em 4.000 chars)
+- Resposta: o que foi feito, resultado verificado e pendências — igual ao `/wake` do blueprint Superagent
+- Segurança: `WAKE_TOKEN` no ambiente exige o header `x-wake-token`; rate limit de IA aplicado
+- Exemplo completo de uso: workflow "Código GitHub no Gmail" em `superagent-clone/workflows/`
+
+**Estado atual do merge:** 72 testes verdes, `tsc --noEmit` limpo, build Vite ok,
+`/api/health` e `/api/wake` validados ao vivo com fallback offline (Heuristic Engine).

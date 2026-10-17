@@ -11,6 +11,7 @@ import { executeShell, validateShellCommand } from './src/core/tools/shell.ts';
 import { webFetch, webSearch } from './src/core/tools/web-tools.ts';
 import { CONNECTOR_CATALOG } from './src/core/connectors/connectors-registry.ts';
 import { verifyConnectorCredentials } from './src/core/connectors/verify.ts';
+import { composeWakeMessage, shouldWakePass, WAKE_SYSTEM_INSTRUCTION } from './src/core/automation/wake.ts';
 
 dotenv.config();
 
@@ -396,6 +397,52 @@ Responda em português brasileiro de forma assertiva, moderna, profissional e se
     sources,
     agentId: agent.id,
     agentName: agent.name,
+    provider: `${result.providerId}:${result.model}`,
+    local: result.local,
+    fallbackReason: result.fallbackReason,
+  });
+});
+
+
+// ===== Wake: automações externas acordam o agente (n8n/cron/webhook de canal) =====
+// Equivalente ao /wake do blueprint Superagent. Guarda opcional: WAKE_TOKEN no
+// ambiente exige o header x-wake-token (recomendado em produção).
+app.post('/api/wake', aiRateLimitMiddleware, async (req: Request, res: Response) => {
+  const { source = 'automation', context, agentId, providerId, model } = req.body as {
+    message?: string;
+    source?: string;
+    context?: Record<string, unknown>;
+    agentId?: string;
+    providerId?: string;
+    model?: string;
+  };
+
+  if (!shouldWakePass(req.get('x-wake-token'), process.env.WAKE_TOKEN)) {
+    res.status(401).json({ error: 'Token de wake inválido ou ausente.' });
+    return;
+  }
+
+  let fullMessage: string;
+  try {
+    fullMessage = composeWakeMessage({ message: req.body?.message ?? '', source, context });
+  } catch {
+    res.status(400).json({ error: 'Wake sem mensagem.' });
+    return;
+  }
+
+  const result = await chatWithFallback(
+    {
+      messages: [{ role: 'user', content: fullMessage }],
+      systemInstruction: `${WAKE_SYSTEM_INSTRUCTION}\nOrigem do gatilho: ${source}.${
+        agentId ? `\nAgente-alvo sugerido: ${agentId}.` : ''
+      }`,
+    },
+    { providerId, model },
+  );
+
+  res.json({
+    response: SecurityGuard.sanitizeOutput(result.text),
+    source,
     provider: `${result.providerId}:${result.model}`,
     local: result.local,
     fallbackReason: result.fallbackReason,
