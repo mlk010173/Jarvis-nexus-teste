@@ -64,10 +64,10 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     isLocal: false,
     envKey: 'NVIDIA_NIM_API_KEY',
     baseUrl: 'https://integrate.api.nvidia.com/v1',
-    defaultModel: 'nvidia/llama-3.3-nemotron-super-49b-v1.5',
+    defaultModel: 'nvidia/nemotron-3.5-super-vl-120b-a12b',
     models: [
-      'nvidia/llama-3.3-nemotron-super-49b-v1.5',
-      'deepseek-ai/deepseek-r1',
+      'nvidia/nemotron-3.5-super-vl-120b-a12b',
+      'nvidia/nemotron-3-super-120b-a12b',
     ],
     costNotes:
       'Créditos iniciais gratuitos para desenvolvedores (limitados); consumo contínuo é pago.',
