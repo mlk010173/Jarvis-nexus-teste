@@ -341,11 +341,11 @@ export default function App() {
             className="flex items-center gap-2 group text-left focus:outline-none focus:ring-2 focus:ring-cyan-400 rounded-lg p-0.5"
             aria-label="Ir para a tela inicial do JARVIS NEXUS"
           >
-            <div className="w-8 h-8 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-              <Cpu className="w-5 h-5 text-cyan-400 animate-pulse" />
+            <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-cyan-400/50 shadow-[0_0_18px_rgba(34,211,238,0.45)] globe-glow">
+              <img src="assets/jarvis-logo.png" alt="Logo oficial JARVIS NEXUS" className="w-full h-full object-cover" />
             </div>
             <div>
-              <div className="text-xs font-black tracking-wider uppercase bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500 bg-clip-text text-transparent">
+              <div className="text-xs font-black tracking-wider uppercase text-animated-gradient neon-flicker">
                 JARVIS NEXUS
               </div>
               <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5">

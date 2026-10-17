@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { ExecutionPlan } from '../core/orchestrator/types.ts';
 import { HolographicCore } from '../components/HolographicCore.tsx';
+import { Particles, Meteors, GlowStars, SpotlightCard, TiltCard, NumberTicker } from '../components/MagicEffects.tsx';
 import {
   MessageSquare,
   Users,
@@ -56,27 +57,65 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   return (
     <div className="space-y-6 pb-24">
-      {/* Hero Hologram Section */}
-      <div className="flex flex-col items-center text-center pt-2">
+      {/* HERO OFICIAL: banner cinematográfico + efeitos Magic UI */}
+      <div className="hero-banner relative -mx-3 sm:mx-0">
+        <img
+          src="assets/jarvis-hero-banner.png"
+          alt="Banner oficial JARVIS NEXUS"
+          className="h-44 sm:h-56 object-cover"
+        />
+        <div className="hero-overlay" />
+        <Particles quantity={36} />
+        <div className="absolute inset-0 pointer-events-none overflow-hidden"><Meteors count={6} /></div>
+        <div className="absolute inset-0 pointer-events-none overflow-hidden"><GlowStars count={12} /></div>
+
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+          <div className="blur-fade-in inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950/70 border border-cyan-400/40 backdrop-blur-md text-xs font-mono text-cyan-200 border-beam">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 heartbeat" />
+            <span>JARVIS NEXUS // ONLINE</span>
+          </div>
+          <h1 className="blur-fade-in-1 text-3xl sm:text-4xl font-black tracking-tight mt-2 text-animated-gradient drop-shadow-[0_2px_12px_rgba(3,7,18,0.9)]">
+            Seu Superagente de IA no Celular
+          </h1>
+          <p className="blur-fade-in-2 text-xs sm:text-sm text-slate-300 mt-1 max-w-md mx-auto drop-shadow-[0_1px_8px_rgba(3,7,18,1)]">
+            Multiagentes • Autônomo • Gemini na nuvem • Magic UI
+          </p>
+        </div>
+      </div>
+
+      {/* Agente Base44 oficial integrado */}
+      <TiltCard className="grad-border p-[1px]">
+        <SpotlightCard className="rounded-2xl bg-slate-950/95 p-4 flex items-center gap-3.5">
+          <div className="relative w-12 h-12 shrink-0 rounded-xl overflow-hidden border border-indigo-400/50 shadow-[0_0_20px_rgba(129,140,248,0.5)] globe-glow">
+            <img src="assets/jarvis-logo.png" alt="Agente Base44" className="w-full h-full object-cover" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">Superagent Base44</span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-indigo-500/20 border border-indigo-400/40 text-indigo-300 heartbeat">EMBUTIDO</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              O mesmo agente do Pedro rodando aqui dentro — provedora <span className="font-mono text-indigo-300">base44-superagent</span> no chat, com fallback automático pra Gemini.
+            </p>
+          </div>
+          <a
+            href="https://app.base44.com/superagent/6acc0c0ddb498af88eaaf945"
+            target="_blank"
+            rel="noreferrer"
+            className="shimmer-btn shrink-0 rounded-xl px-3 py-2 text-xs font-bold text-white"
+          >
+            Abrir
+          </a>
+        </SpotlightCard>
+      </TiltCard>
+
+      {/* Core holográfico interativo */}
+      <div className="flex flex-col items-center text-center pt-1">
         <HolographicCore
           state={isListening ? 'listening' : 'idle'}
           size="md"
           onClick={() => onStartVoice?.()}
         />
-
-        <div className="mt-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-xs font-mono text-cyan-300">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span>JARVIS NEXUS // 100% OPEN-SOURCE</span>
-          </div>
-
-          <h1 className="text-3xl font-extrabold tracking-tight mt-2 text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-200 to-sky-400">
-            Seu Superagente de IA no Celular
-          </h1>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-            Multiagentes • Autônomo • Modular • IA Real sem limites
-          </p>
-        </div>
       </div>
 
       {/* Main Command Input */}
