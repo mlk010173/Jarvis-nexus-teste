@@ -68,26 +68,50 @@ export async function clima(cidade: string): Promise<ClimaResult> {
   const local = geo?.results?.[0];
   if (!local) throw new Error(`Cidade não encontrada: ${limpa}`);
 
-  const w = (await getJson(
-    `https://api.open-meteo.com/v1/forecast?latitude=${local.latitude}&longitude=${local.longitude}` +
-      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
-      `&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`
-  )) as {
-    current: { temperature_2m: number; relative_humidity_2m: number; apparent_temperature: number; weather_code: number; wind_speed_10m: number };
-    daily: { temperature_2m_max: number[]; temperature_2m_min: number[] };
-  };
-  const cur = w.current;
-  return {
-    cidade: [local.name, local.admin1, local.country].filter(Boolean).join(', '),
-    temperatura: cur.temperature_2m,
-    sensacao: cur.apparent_temperature,
-    descricao: WEATHER_CODE_PT[cur.weather_code] ?? '—',
-    umidade: cur.relative_humidity_2m,
-    vento_kmh: cur.wind_speed_10m,
-    minima: w.daily.temperature_2m_min[0],
-    maxima: w.daily.temperature_2m_max[0],
-    fonte: 'Open-Meteo',
-  };
+  try {
+    const w = (await getJson(
+      `https://api.open-meteo.com/v1/forecast?latitude=${local.latitude}&longitude=${local.longitude}` +
+        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
+        `&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`
+    )) as {
+      current: { temperature_2m: number; relative_humidity_2m: number; apparent_temperature: number; weather_code: number; wind_speed_10m: number };
+      daily: { temperature_2m_max: number[]; temperature_2m_min: number[] };
+    };
+    const cur = w.current;
+    return {
+      cidade: [local.name, local.admin1, local.country].filter(Boolean).join(', '),
+      temperatura: cur.temperature_2m,
+      sensacao: cur.apparent_temperature,
+      descricao: WEATHER_CODE_PT[cur.weather_code] ?? '—',
+      umidade: cur.relative_humidity_2m,
+      vento_kmh: cur.wind_speed_10m,
+      minima: w.daily.temperature_2m_min[0],
+      maxima: w.daily.temperature_2m_max[0],
+      fonte: 'Open-Meteo',
+    };
+  } catch {
+    // Fallback: wttr.in (grátis, sem chave) — IPs de datacenter podem ser
+    // limitados pelo Open-Meteo; o wttr.in aceita bem.
+    const w2 = (await getJson(`https://wttr.in/${encodeURIComponent(limpa)}?format=j1`)) as {
+      current_condition?: Array<{ temp_C: string; FeelsLikeC: string; humidity: string; windspeedKmph: string; weatherDesc?: Array<{ value: string }> }>;
+      weather?: Array<{ mintempC: string; maxtempC: string }>;
+      nearest_area?: Array<{ areaName?: Array<{ value: string }>; country?: Array<{ value: string }> }>;
+    };
+    const cur = w2?.current_condition?.[0];
+    if (!cur) throw new Error('Clima indisponível agora (Open-Meteo e wttr.in falharam).');
+    const area = w2?.nearest_area?.[0];
+    return {
+      cidade: [area?.areaName?.[0]?.value ?? limpa, area?.country?.[0]?.value].filter(Boolean).join(', '),
+      temperatura: Number(cur.temp_C),
+      sensacao: Number(cur.FeelsLikeC),
+      descricao: cur.weatherDesc?.[0]?.value ?? '—',
+      umidade: Number(cur.humidity),
+      vento_kmh: Number(cur.windspeedKmph),
+      minima: Number(w2?.weather?.[0]?.mintempC ?? 0),
+      maxima: Number(w2?.weather?.[0]?.maxtempC ?? 0),
+      fonte: 'wttr.in',
+    };
+  }
 }
 
 // ===== Moedas (AwesomeAPI) =====
