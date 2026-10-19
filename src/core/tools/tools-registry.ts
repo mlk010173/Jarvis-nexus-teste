@@ -1,5 +1,6 @@
 import type { ToolDefinition, ToolExecutionResult } from './types.ts';
 import { webFetch, webSearch } from './web-tools.ts';
+import { clima, moedas, cripto, feriados, wiki } from './data-commands.ts';
 
 export const TOOLS_CATALOG: ToolDefinition[] = [
   {
@@ -158,6 +159,73 @@ export const TOOLS_CATALOG: ToolDefinition[] = [
     requiresApproval: true,
     isLocal: false,
     sideEffects: 'Envia um e-mail real pela conta Gmail do servidor (SMTP TLS).'
+  },
+  {
+    name: 'clima',
+    category: 'web',
+    title: 'Clima ao Vivo',
+    description: 'Previsão atual de qualquer cidade do mundo (temperatura, sensação, umidade, vento, mín/máx) via Open-Meteo.',
+    parameters: [
+      { name: 'cidade', type: 'string', description: 'Cidade (ex: Vila Velha)', required: true }
+    ],
+    requiresApproval: false,
+    isLocal: false
+  },
+  {
+    name: 'moedas',
+    category: 'web',
+    title: 'Cotações de Moedas',
+    description: 'Cotações ao vivo USD, EUR, GBP e BTC em relação ao Real (AwesomeAPI).',
+    parameters: [],
+    requiresApproval: false,
+    isLocal: false
+  },
+  {
+    name: 'cripto',
+    category: 'web',
+    title: 'Preço de Criptomoedas',
+    description: 'Preço ao vivo de criptomoedas em Reais (Coinbase spot), ex: BTC, ETH, SOL.',
+    parameters: [
+      { name: 'simbolo', type: 'string', description: 'Símbolo da cripto (padrão BTC)', required: false }
+    ],
+    requiresApproval: false,
+    isLocal: false
+  },
+  {
+    name: 'feriados',
+    category: 'web',
+    title: 'Feriados Nacionais',
+    description: 'Lista os feriados nacionais do Brasil de um ano (BrasilAPI).',
+    parameters: [
+      { name: 'ano', type: 'string', description: 'Ano (padrão: atual)', required: false }
+    ],
+    requiresApproval: false,
+    isLocal: false
+  },
+  {
+    name: 'wiki',
+    category: 'web',
+    title: 'Consulta Wikipédia',
+    description: 'Busca termo na Wikipédia em português e devolve resumo introdutório com link.',
+    parameters: [
+      { name: 'termo', type: 'string', description: 'Termo a consultar', required: true }
+    ],
+    requiresApproval: false,
+    isLocal: false
+  },
+  {
+    name: 'jarvis_backend',
+    category: 'web',
+    title: 'Ponte Backend JARVIS',
+    description: 'Consulta rotas reais do backend JARVIS (contas, comandos e dados) hospedado na nuvem Base44 do usuário.',
+    parameters: [
+      { name: 'rota', type: 'string', description: 'Rota /api/... do backend JARVIS', required: true },
+      { name: 'metodo', type: 'string', description: 'GET | POST | PUT (padrão GET)', required: false },
+      { name: 'corpo', type: 'string', description: 'Corpo JSON da requisição (opcional)', required: false }
+    ],
+    requiresApproval: false,
+    isLocal: false,
+    sideEffects: 'Somente leitura/consulta ao backend próprio do usuário (via JARVIS_API_KEY).'
   },
   {
     name: 'system_diagnostics',
@@ -437,6 +505,41 @@ CMD ["node", "server.js"]`;
           },
           durationMs: Date.now() - startTime
         };
+      }
+
+      case 'clima': {
+        const r = await clima(String(args.cidade || args.query || ''));
+        return { toolName, success: true, output: r, durationMs: Date.now() - startTime };
+      }
+
+      case 'moedas': {
+        const r = await moedas();
+        return { toolName, success: true, output: r, durationMs: Date.now() - startTime };
+      }
+
+      case 'cripto': {
+        const r = await cripto(String(args.simbolo || 'BTC'));
+        return { toolName, success: true, output: r, durationMs: Date.now() - startTime };
+      }
+
+      case 'feriados': {
+        const r = await feriados(args.ano ? Number(args.ano) : undefined);
+        return { toolName, success: true, output: r, durationMs: Date.now() - startTime };
+      }
+
+      case 'wiki': {
+        const r = await wiki(String(args.termo || args.query || ''));
+        return { toolName, success: true, output: r, durationMs: Date.now() - startTime };
+      }
+
+      case 'jarvis_backend': {
+        const { callJarvisBackend } = await import('./jarvis-bridge.ts');
+        const r = await callJarvisBackend({
+          rota: String(args.rota || ''),
+          metodo: String(args.metodo || 'GET'),
+          corpo: typeof args.corpo === 'string' ? JSON.parse(args.corpo) : (args.corpo ?? {}),
+        });
+        return { toolName, success: true, output: r, durationMs: Date.now() - startTime };
       }
 
       default:

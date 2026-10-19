@@ -9,6 +9,8 @@ import { chatWithFallback, listProviderStatus, resolveProvider } from './src/cor
 import { executePlan, PlanRunStore } from './src/core/orchestrator/executor.ts';
 import { executeShell, validateShellCommand } from './src/core/tools/shell.ts';
 import { webFetch, webSearch } from './src/core/tools/web-tools.ts';
+import { clima, moedas, cripto, feriados, wiki } from './src/core/tools/data-commands.ts';
+import { callJarvisBackend, isJarvisBridgeConfigured } from './src/core/tools/jarvis-bridge.ts';
 import { CONNECTOR_CATALOG } from './src/core/connectors/connectors-registry.ts';
 import { verifyConnectorCredentials } from './src/core/connectors/verify.ts';
 import { composeWakeMessage, shouldWakePass, WAKE_SYSTEM_INSTRUCTION } from './src/core/automation/wake.ts';
@@ -148,6 +150,62 @@ app.post('/api/providers/test', aiRateLimitMiddleware, async (req: Request, res:
 });
 
 // ===== Ferramentas reais =====
+// ===== Comandos de dados reais (clima, moedas, cripto, feriados, wiki) =====
+// Dados ao vivo de APIs públicas gratuitas — sem chave, sem custo, sem fingir.
+app.post('/api/tools/clima', async (req: Request, res: Response) => {
+  try {
+    res.json(await clima(String(req.body?.cidade || req.body?.query || '')));
+  } catch (e) {
+    res.status(400).json({ erro: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.get('/api/tools/moedas', async (_req: Request, res: Response) => {
+  try {
+    res.json(await moedas());
+  } catch (e) {
+    res.status(502).json({ erro: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.post('/api/tools/cripto', async (req: Request, res: Response) => {
+  try {
+    res.json(await cripto(String(req.body?.simbolo || 'BTC')));
+  } catch (e) {
+    res.status(400).json({ erro: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.get('/api/tools/feriados', async (req: Request, res: Response) => {
+  try {
+    res.json(await feriados(req.query?.ano ? Number(req.query.ano) : undefined));
+  } catch (e) {
+    res.status(502).json({ erro: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.post('/api/tools/wiki', async (req: Request, res: Response) => {
+  try {
+    res.json(await wiki(String(req.body?.termo || req.body?.query || '')));
+  } catch (e) {
+    res.status(400).json({ erro: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+// ===== Ponte com o backend JARVIS (function jarvisApi na nuvem Base44) =====
+app.post('/api/tools/jarvis-backend', async (req: Request, res: Response) => {
+  if (!isJarvisBridgeConfigured()) {
+    res.status(503).json({ erro: 'Ponte JARVIS não configurada (JARVIS_API_KEY / JARVIS_BACKEND_URL).' });
+    return;
+  }
+  try {
+    const { rota, metodo, corpo, token } = (req.body ?? {}) as { rota?: string; metodo?: string; corpo?: unknown; token?: string };
+    res.json(await callJarvisBackend({ rota: String(rota || ''), metodo, corpo, token: token ?? null }));
+  } catch (e) {
+    res.status(400).json({ erro: e instanceof Error ? e.message : String(e) });
+  }
+});
+
 app.post('/api/tools/fetch', async (req: Request, res: Response) => {
   const { url } = req.body as { url?: string };
   try {
@@ -373,6 +431,32 @@ app.post('/api/chat', aiRateLimitMiddleware, async (req: Request, res: Response)
     }
   }
 
+  // Dados AO VIVO (clima, moedas, cripto, feriados, wiki): mesma filosofia das
+  // fontes — se o pedido pedir dado real, buscamos antes de responder.
+  let dadosReais = '';
+  try {
+    const msgBaixa = String(message).toLowerCase();
+    const mCidade = String(message).match(/clima\s+(?:em|n[oa]|de|d[oa])?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s-]{2,40})/i);
+    if (mCidade) {
+      dadosReais += `\n[CLIMA AO VIVO — ${JSON.stringify(await clima(mCidade[1].trim()))}]`;
+    }
+    if (/d[óo]lar|dolar|euro|libra|c[âa]mbio|moeda|cota[çc][ãa]o/.test(msgBaixa)) {
+      dadosReais += `\n[COTAÇÕES AO VIVO — ${JSON.stringify(await moedas())}]`;
+    }
+    if (/bitcoin|\bbtc\b|cripto|ethereum|\beth\b|solana/.test(msgBaixa)) {
+      dadosReais += `\n[CRIPTO AO VIVO — ${JSON.stringify(await cripto(/ethereum|\beth\b/.test(msgBaixa) ? 'ETH' : /solana/.test(msgBaixa) ? 'SOL' : 'BTC'))}]`;
+    }
+    if (/feriado/.test(msgBaixa)) {
+      dadosReais += `\n[FERIADOS NACIONAIS — ${JSON.stringify(await feriados())}]`;
+    }
+    const mWiki = String(message).match(/(?:o que (?:é|e|são)|quem (?:foi|é)|significa)\s+([\wÀ-ÿ][\wÀ-ÿ\s-]{2,50})/i);
+    if (mWiki && !dadosReais) {
+      dadosReais += `\n[WIKIPÉDIA — ${JSON.stringify(await wiki(mWiki[1].replace(/[?.!]/g, '').trim()))}]`;
+    }
+  } catch {
+    // sem dado ao vivo: segue sem fingir
+  }
+
   const result = await chatWithFallback(
     {
       messages: [
@@ -386,6 +470,8 @@ app.post('/api/chat', aiRateLimitMiddleware, async (req: Request, res: Response)
 Suas instruções específicas: ${agent.instructions}
 Responda em português brasileiro de forma assertiva, moderna, profissional e sem enrolação. Quando apropriado, mencione ferramentas e agentes especializados mobilizados.${
         memoryContext ? `\n\nMEMÓRIA PERSISTENTE DO USUÁRIO (use como contexto contínuo):\n${memoryContext}` : ''
+      }${
+        dadosReais ? `\n\nDADOS REAIS AO VIVO (use exatamente estes valores na resposta):${dadosReais}` : ''
       }${
         sources.length
           ? `\n\nFONTES REAIS DA WEB (busca ao vivo DuckDuckGo). Cite-as no texto como [1], [2]… na ordem em que usar:\n${sources
